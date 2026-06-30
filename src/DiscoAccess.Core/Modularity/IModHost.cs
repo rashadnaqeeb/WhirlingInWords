@@ -1,3 +1,4 @@
+using DiscoAccess.Core.Audio;
 using DiscoAccess.Core.Settings;
 using DiscoAccess.Core.Speech;
 
@@ -21,5 +22,9 @@ namespace DiscoAccess.Core.Modularity
         /// <summary>The mod's settings, owned by the host so they outlive a module reload and persist
         /// through the host's config file.</summary>
         ModSettings Settings { get; }
+
+        /// <summary>The spatial-audio backend (sonar, wall tones). Host-owned (native device handle), so it
+        /// survives a module reload; the module's sensing systems play through it.</summary>
+        IAudioEngine Audio { get; }
     }
 }

@@ -271,5 +271,30 @@ namespace DiscoAccess.Core.Strings
 
         /// <summary>A stepped slider's position when no authored words map to it.</summary>
         public static string Step(int index, int count) => "step " + index + " of " + count;
+
+        // ---- World navigation ----
+
+        // The world cursor's spatial readout: an eight-point compass bearing, a distance in metres, and a
+        // vertical offset, all relative to the player. These are the mod's own world-cursor controls with no
+        // DE string to read, so they are authored. Distances are in metres (Disco's 1 unit = 1 metre scale).
+        private static readonly string[] WorldCompassWords =
+            { "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest" };
+
+        /// <summary>An eight-point compass word for a bearing index 0..7 (0 = north), or empty when out of
+        /// range (the coincident "here" case, which the readout handles separately).</summary>
+        public static string WorldCompass(int index)
+            => index >= 0 && index < WorldCompassWords.Length ? WorldCompassWords[index] : "";
+
+        /// <summary>A whole-metre distance, e.g. "3 meters", "1 meter"; under a metre reads "less than a
+        /// meter" so a near-but-not-coincident point never reads "0 meters".</summary>
+        public static string WorldDistance(int meters)
+            => meters <= 0 ? "less than a meter" : meters == 1 ? "1 meter" : meters + " meters";
+
+        public const string WorldHere = "here";
+        public const string WorldAbove = "above";
+        public const string WorldBelow = "below";
+
+        // The world sensing systems' names, spoken in the settings menu. Authored (the mod's own systems).
+        public const string WorldSystemSpatial = "cursor position";
     }
 }

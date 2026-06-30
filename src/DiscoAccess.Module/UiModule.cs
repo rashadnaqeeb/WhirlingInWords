@@ -4,6 +4,7 @@ using DiscoAccess.Core.Strings;
 using DiscoAccess.Core.UI.Nav;
 using DiscoAccess.Module.Input;
 using DiscoAccess.Module.Nav;
+using DiscoAccess.Module.World;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -30,6 +31,9 @@ namespace DiscoAccess.Module
         // Our own UI navigation: it takes the keyboard on any screen with a registered Screen and drives
         // the navigator from our own input.
         private ScreenManager _screens;
+        // The world-layer reader: owns the sensing overlay and drives it while the player is in the
+        // isometric scene. Independent of the screen navigator (which handles menus).
+        private WorldReader _world;
         private static readonly InputCategory[] UiCategory = { InputCategory.UI };
         // The global mod-menu hotkey's action key (internal id, never spoken).
         private const string ModMenuAction = "mod.menu";
@@ -51,6 +55,8 @@ namespace DiscoAccess.Module
             // Stand up the keyboard input substrate and our UI navigation.
             _input = new InputManager();
             _screens = new ScreenManager(_host);
+            // The world sensing overlay, driven each frame while in the isometric scene.
+            _world = new WorldReader(_host);
 
             // UI navigation keys: live only while our navigator owns the keyboard, and routed into it by
             // the dispatcher below. Directions and Tab auto-repeat while held.
@@ -136,6 +142,10 @@ namespace DiscoAccess.Module
             // save-list rebuild and as a single announce.
             if (_editGate.JustBegan)
                 _host.Speech.Speak(Strings.StatusEditMode, interrupt: false);
+
+            // Drive the world sensing overlay. It self-gates on the in-game (LOBBY) view, so it is idle in
+            // menus, dialogue, and at the title; independent of the screen navigator above.
+            _world.Tick();
         }
 
         // Dev seam (IDevDriver): drive our navigator from the dev server's /input, the headless counterpart
@@ -163,10 +173,12 @@ namespace DiscoAccess.Module
             // Hand the keyboard back to the game before tearing down, so a reload never leaves InControl
             // disabled.
             _screens.HandBack();
+            _world?.Dispose(); // disengage the overlay (release any audio voices) before the context drops
             _harmony?.UnpatchSelf();
             _harmony = null;
             _input = null; // owns no native handle; the registration list goes with the dropped context
             _screens = null;
+            _world = null;
             _host = null;
         }
     }

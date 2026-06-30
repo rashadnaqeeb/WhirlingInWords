@@ -36,6 +36,9 @@
          Shipped beside the plugin via DeployToGame (it and its deps land in the output by
          CopyLocalLockFileAssemblies). -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
+    <!-- Our own stereo audio backend for the spatial soundscape (sonar, wall tones), kept off the game's
+         mixer. Ships beside the plugin via CopyLocalLockFileAssemblies. -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
   <!--

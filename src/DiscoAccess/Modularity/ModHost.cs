@@ -1,4 +1,5 @@
 using BepInEx.Logging;
+using DiscoAccess.Core.Audio;
 using DiscoAccess.Core.Modularity;
 using DiscoAccess.Core.Settings;
 using DiscoAccess.Core.Speech;
@@ -14,16 +15,19 @@ namespace DiscoAccess.Modularity
     {
         private readonly ManualLogSource _log;
 
-        public ModHost(ManualLogSource log, SpeechPipeline speech, ModSettings settings)
+        public ModHost(ManualLogSource log, SpeechPipeline speech, ModSettings settings, IAudioEngine audio)
         {
             _log = log;
             Speech = speech;
             Settings = settings;
+            Audio = audio;
         }
 
         public SpeechPipeline Speech { get; }
 
         public ModSettings Settings { get; }
+
+        public IAudioEngine Audio { get; }
 
         public void LogInfo(string message) => _log.LogInfo(message);
         public void LogWarning(string message) => _log.LogWarning(message);

@@ -28,6 +28,7 @@ namespace DiscoAccess
         internal static ManualLogSource Logger;
 
         private PrismBackend _prism;
+        private Audio.NAudioEngine _audio;
         private ModuleLoader _loader;
 #if DEBUG
         private DevServer _devServer;
@@ -55,7 +56,11 @@ namespace DiscoAccess
             // survive a module hot-reload; the module reads them through IModHost.Settings.
             var settings = new ModSettings(new BepInExSettingsStore(Config));
 
-            var host = new ModHost(Log, SpeechPipeline.Instance, settings);
+            // The spatial-audio backend (sonar, wall tones). Native device, so it lives here in the host
+            // beside Prism; the device opens lazily on first sound and self-disables if none is available.
+            _audio = new Audio.NAudioEngine(Log);
+
+            var host = new ModHost(Log, SpeechPipeline.Instance, settings, _audio);
 
             string pluginDir = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
             string modulePath = Path.Combine(pluginDir, "DiscoAccess.Module.dll");

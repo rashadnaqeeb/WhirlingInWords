@@ -23,6 +23,13 @@ namespace DiscoAccess.Module.World
         public bool IsAccessible => _orb.orbType != OrbType.NONE;
         public bool IsVisible => _orb.orbType != OrbType.NONE;
 
+        // An orb has no interaction stand-point of its own (its clickable lives on the SenseOrb UI, which
+        // only activates once the camera is on the orb), so the cursor navigates to the orb's body and orb
+        // interaction stays deferred until camera-follow lands. The body is the navigation target; nothing
+        // is actionable yet.
+        public Vector3 InteractionPoint(Vector3 from) => Position;
+        public bool IsActionable(Vector3 from) => false;
+
         // Orbs are activated through their UI element, not a direct world interaction; deferred.
         public bool Interact() => false;
     }

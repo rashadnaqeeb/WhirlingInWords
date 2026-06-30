@@ -30,6 +30,22 @@ namespace DiscoAccess.Core.World
         /// <summary>Whether the player could currently know about this thing (revealed, streamed in).</summary>
         bool IsVisible { get; }
 
+        /// <summary>The on-navmesh stand-point to approach this thing from <paramref name="from"/> in order
+        /// to act on it (the game's interaction location). The point the sonar pings, the scanner targets,
+        /// and the go-here distance measures to: it sits on reachable ground, so following it leads to a
+        /// successful interaction, and it dissolves the across-a-barrier case (a fenced NPC's talk-spot, not
+        /// its unreachable body). Approach-relative, so it is recomputed from the querying position rather
+        /// than a fixed landmark. A thing with no interaction stand-point (an orb, whose interaction is
+        /// deferred until camera-follow) returns its body <see cref="Position"/>.</summary>
+        Vector3 InteractionPoint(Vector3 from);
+
+        /// <summary>Whether the game can currently path to this thing's interaction stand-point from
+        /// <paramref name="from"/> (the game's own reachability oracle). The live per-position verdict on
+        /// whether acting on it would succeed; never cached and never inferred from <see cref="IsAccessible"/>,
+        /// which a walled-off thing can pass while being unreachable. A thing unreachable from here can become
+        /// reachable once the character has moved.</summary>
+        bool IsActionable(Vector3 from);
+
         /// <summary>Trigger the game's interaction for this thing (auto-path and act). Returns whether
         /// something was triggered.</summary>
         bool Interact();

@@ -34,7 +34,11 @@ namespace DiscoAccess.Module
         // The world-layer reader: owns the sensing overlay and drives it while the player is in the
         // isometric scene. Independent of the screen navigator (which handles menus).
         private WorldReader _world;
+        // The world hotkeys that act on the game (open screens, status reads, quick-actions), as opposed to
+        // the cursor verbs the reader handles.
+        private WorldCommands _commands;
         private static readonly InputCategory[] UiCategory = { InputCategory.UI };
+        private static readonly InputCategory[] WorldCategory = { InputCategory.World };
         // The global mod-menu hotkey's action key (internal id, never spoken).
         private const string ModMenuAction = "mod.menu";
         // The single source of truth for "a game text field owns the keyboard" (grace-inclusive). While
@@ -57,6 +61,7 @@ namespace DiscoAccess.Module
             _screens = new ScreenManager(_host);
             // The world sensing overlay, driven each frame while in the isometric scene.
             _world = new WorldReader(_host);
+            _commands = new WorldCommands(_host);
 
             // UI navigation keys: live only while our navigator owns the keyboard, and routed into it by
             // the dispatcher below. Directions and Tab auto-repeat while held.
@@ -76,6 +81,51 @@ namespace DiscoAccess.Module
             _input.Register(UiActions.Home, Strings.InputJumpFirst, InputCategory.UI).AddBinding(new KeyboardBinding(KeyCode.Home));
             _input.Register(UiActions.End, Strings.InputJumpLast, InputCategory.UI).AddBinding(new KeyboardBinding(KeyCode.End));
 
+            // World keys: live only while the world reader owns the keyboard (free-roam with control, no menu
+            // taking it). The WASD glide keys are polled as a held vector each frame (read in Tick), not fired
+            // handlers, so they carry no Performed callback and do not repeat; the verbs fire WorldReader
+            // methods directly (like the mod-menu hotkey, never routed through the navigator).
+            _input.Register(WorldActions.MoveNorth, Strings.InputWorldMoveNorth, InputCategory.World).AddBinding(new KeyboardBinding(KeyCode.W));
+            _input.Register(WorldActions.MoveSouth, Strings.InputWorldMoveSouth, InputCategory.World).AddBinding(new KeyboardBinding(KeyCode.S));
+            _input.Register(WorldActions.MoveEast, Strings.InputWorldMoveEast, InputCategory.World).AddBinding(new KeyboardBinding(KeyCode.D));
+            _input.Register(WorldActions.MoveWest, Strings.InputWorldMoveWest, InputCategory.World).AddBinding(new KeyboardBinding(KeyCode.A));
+            _input.Register(WorldActions.Recenter, Strings.InputWorldRecenter, InputCategory.World, () => _world.Recenter()).AddBinding(new KeyboardBinding(KeyCode.C));
+            _input.Register(WorldActions.Interact, Strings.InputWorldInteract, InputCategory.World, () => _world.Interact())
+                .AddBinding(new KeyboardBinding(KeyCode.Return)).AddBinding(new KeyboardBinding(KeyCode.KeypadEnter));
+            _input.Register(WorldActions.Stop, Strings.InputWorldStop, InputCategory.World, () => _world.Cancel()).AddBinding(new KeyboardBinding(KeyCode.Space));
+
+            // Information screens: the game's own hotkey letter under Ctrl, so the bare letters stay free for
+            // the cursor/status keys (C recenters, T/M read time/money). They open the game's view; our screen
+            // reader then drives it, and Escape (the screen's Back) closes it. The map has no standalone view
+            // (it is a tab inside the journal, reachable via Ctrl+J), so it gets no key of its own.
+            _input.Register(WorldActions.OpenInventory, Strings.InputWorldInventory, InputCategory.World, () => _commands.OpenInventory()).AddBinding(new KeyboardBinding(KeyCode.I, ctrl: true));
+            _input.Register(WorldActions.OpenCharacterSheet, Strings.InputWorldCharacterSheet, InputCategory.World, () => _commands.OpenCharacterSheet()).AddBinding(new KeyboardBinding(KeyCode.C, ctrl: true));
+            _input.Register(WorldActions.OpenJournal, Strings.InputWorldJournal, InputCategory.World, () => _commands.OpenJournal()).AddBinding(new KeyboardBinding(KeyCode.J, ctrl: true));
+            _input.Register(WorldActions.OpenThoughtCabinet, Strings.InputWorldThoughtCabinet, InputCategory.World, () => _commands.OpenThoughtCabinet()).AddBinding(new KeyboardBinding(KeyCode.T, ctrl: true));
+            _input.Register(WorldActions.Pause, Strings.InputWorldPause, InputCategory.World, () => _commands.OpenPauseMenu()).AddBinding(new KeyboardBinding(KeyCode.Escape));
+            _input.Register(WorldActions.Help, Strings.InputWorldHelp, InputCategory.World, () => _commands.OpenHelp()).AddBinding(new KeyboardBinding(KeyCode.F1));
+
+            // Gameplay quick-actions. Left/Right use the assigned heal item for the two bars (matching the
+            // controller dpad); 1/2 use the hand-equipped items; F5/F8 quicksave/quickload.
+            _input.Register(WorldActions.HealEndurance, Strings.InputWorldHealHealth, InputCategory.World, () => _commands.HealEndurance()).AddBinding(new KeyboardBinding(KeyCode.LeftArrow));
+            _input.Register(WorldActions.HealVolition, Strings.InputWorldHealMorale, InputCategory.World, () => _commands.HealVolition()).AddBinding(new KeyboardBinding(KeyCode.RightArrow));
+            _input.Register(WorldActions.LeftHandItem, Strings.InputWorldLeftHandItem, InputCategory.World, () => _commands.UseLeftHand()).AddBinding(new KeyboardBinding(KeyCode.Alpha1));
+            _input.Register(WorldActions.RightHandItem, Strings.InputWorldRightHandItem, InputCategory.World, () => _commands.UseRightHand()).AddBinding(new KeyboardBinding(KeyCode.Alpha2));
+            _input.Register(WorldActions.QuickSave, Strings.InputWorldQuickSave, InputCategory.World, () => _commands.QuickSave()).AddBinding(new KeyboardBinding(KeyCode.F5));
+            _input.Register(WorldActions.QuickLoad, Strings.InputWorldQuickLoad, InputCategory.World, () => _commands.QuickLoad()).AddBinding(new KeyboardBinding(KeyCode.F8));
+
+            // Status readouts: bare letters, each press re-reads (distinct by modifier from the Ctrl+letter
+            // screen keys: T thought cabinet vs T time, etc.).
+            _input.Register(WorldActions.ReadTime, Strings.InputWorldReadTime, InputCategory.World, () => _commands.ReadTime()).AddBinding(new KeyboardBinding(KeyCode.T));
+            _input.Register(WorldActions.ReadMoney, Strings.InputWorldReadMoney, InputCategory.World, () => _commands.ReadMoney()).AddBinding(new KeyboardBinding(KeyCode.M));
+            _input.Register(WorldActions.ReadHealth, Strings.InputWorldReadHealth, InputCategory.World, () => _commands.ReadHealth()).AddBinding(new KeyboardBinding(KeyCode.H));
+
+            // Ctrl+L cycles the game language, global (the world and menus), since the game's bare-key binding
+            // is killed by type-ahead in our migrated screens. Not while a text field is editing.
+            _input.Register(WorldActions.Language, Strings.InputWorldLanguage, InputCategory.Global,
+                () => { if (!_editGate.Active) _commands.CycleLanguage(); })
+                .AddBinding(new KeyboardBinding(KeyCode.L, ctrl: true));
+
             // Ctrl+M opens/closes the mod's settings menu. Global, so it fires anywhere (the world, a game
             // menu, a conversation); the navigator then drives the overlay through the UI category above. Not
             // while a game text field owns the keyboard, so it never steals a keystroke from a save-name edit.
@@ -83,10 +133,16 @@ namespace DiscoAccess.Module
                 () => { if (!_editGate.Active) _screens.ToggleModMenu(); })
                 .AddBinding(new KeyboardBinding(KeyCode.M, ctrl: true));
 
-            // The UI category is live only while our navigator owns the keyboard (a registered screen, no
-            // popup up); a fired UI key then routes into the navigator. Set by the ScreenManager's Tick,
-            // which runs before input is polled.
-            _input.ActiveCategoriesProvider = () => (_screens.OwnsKeyboard && !_editGate.Active) ? UiCategory : null;
+            // The live category each frame: the UI category while our navigator owns the keyboard (a
+            // registered screen, no popup up), else the World category while the world reader owns it
+            // (free-roam with control). A menu screen is authoritative, so UI wins when both could apply (a
+            // popup over the world). Set after both managers resolve ownership in Tick, before input is polled.
+            _input.ActiveCategoriesProvider = () =>
+            {
+                if (_screens.OwnsKeyboard && !_editGate.Active) return UiCategory;
+                if (_world.OwnsKeyboard) return WorldCategory;
+                return null;
+            };
             _input.JustPressedDispatcher = a =>
             {
                 if (!_screens.OwnsKeyboard || _editGate.Active || a.Category != InputCategory.UI)
@@ -123,13 +179,18 @@ namespace DiscoAccess.Module
             // keyboard back to the game (see TextEditGate); it only gates our own dispatch, via _editGate.
             _editGate.Update();
 
-            // Resolve keyboard ownership for this frame BEFORE polling input (the UI category gates on it):
+            // Resolve keyboard ownership for this frame BEFORE polling input (the live category gates on it):
             // our navigator takes the keyboard on a registered screen or the confirmation popup overlay. A
             // just-ended text edit asks the standing screen to re-read the focused control once.
             _screens.Tick(editEnded: _editGate.JustEnded);
+            // Then the world reader resolves its own ownership: it yields to a menu screen (passed in) and
+            // otherwise takes the keyboard in free-roam. Must run before input so the World category is live
+            // when the glide keys are read below.
+            _world.ResolveOwnership(_screens.OwnsKeyboard);
 
             // Poll our own keyboard input. A Global hotkey fires no matter what screen or popup is up; a
-            // UI key routes into the navigator only while it owns the keyboard and is not gated for an edit.
+            // UI key routes into the navigator only while it owns the keyboard and is not gated for an edit;
+            // a World verb (recenter, interact, stop) fires its WorldReader handler.
             _input.Tick(Time.unscaledTime);
 
             // Read OS-typed characters into the navigator's type-ahead search. Bound nav keys (arrows,
@@ -143,9 +204,18 @@ namespace DiscoAccess.Module
             if (_editGate.JustBegan)
                 _host.Speech.Speak(Strings.StatusEditMode, interrupt: false);
 
-            // Drive the world sensing overlay. It self-gates on the in-game (LOBBY) view, so it is idle in
-            // menus, dialogue, and at the title; independent of the screen navigator above.
-            _world.Tick();
+            // Drive the world sensing overlay and cursor. It self-gates on the in-game (CLEAR) view, so it is
+            // idle in menus, dialogue, and at the title. The held WASD vector (live only while the world owns
+            // the keyboard) glides the cursor; the interact/recenter/stop verbs fired above act on it.
+            float glideX = 0f, glideZ = 0f;
+            if (_world.OwnsKeyboard)
+            {
+                if (_input.Held(WorldActions.MoveEast)) glideX += 1f;
+                if (_input.Held(WorldActions.MoveWest)) glideX -= 1f;
+                if (_input.Held(WorldActions.MoveNorth)) glideZ += 1f;
+                if (_input.Held(WorldActions.MoveSouth)) glideZ -= 1f;
+            }
+            _world.Tick(glideX, glideZ);
         }
 
         // Dev seam (IDevDriver): drive our navigator from the dev server's /input, the headless counterpart
@@ -179,6 +249,7 @@ namespace DiscoAccess.Module
             _input = null; // owns no native handle; the registration list goes with the dropped context
             _screens = null;
             _world = null;
+            _commands = null;
             _host = null;
         }
     }

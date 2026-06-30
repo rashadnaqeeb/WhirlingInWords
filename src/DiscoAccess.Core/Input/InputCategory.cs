@@ -16,5 +16,11 @@ namespace DiscoAccess.Core.Input
         /// <summary>Screen/menu navigation. Live when the focused screen declares it; routed into the
         /// active navigator rather than firing a handler directly.</summary>
         UI,
+
+        /// <summary>The isometric world's own keys (cursor glide, the Enter interact verb, the world
+        /// hotkeys). Live only while the world reader owns the keyboard (the player is in free-roam with
+        /// control and no menu took it). Its actions fire their own handlers, the world reader's, rather
+        /// than routing into the UI navigator.</summary>
+        World,
     }
 }

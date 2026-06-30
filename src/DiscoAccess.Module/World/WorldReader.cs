@@ -1,27 +1,39 @@
 using System;
 using DiscoAccess.Core.Audio;
 using DiscoAccess.Core.Modularity;
+using DiscoAccess.Core.Strings;
 using DiscoAccess.Core.World.Overlays;
 using DiscoAccess.Core.World.Overlays.Systems;
 using Sunshine.Views;
 using UnityEngine;
 using PlayMode = DiscoAccess.Core.World.Overlays.PlayMode; // disambiguate from UnityEngine.PlayMode
+using Snv = System.Numerics.Vector3;
 
 namespace DiscoAccess.Module.World
 {
     /// <summary>
-    /// Owns the one world overlay and drives it each frame while the player is in the isometric scene, the
-    /// world-layer counterpart to <see cref="Nav.ScreenManager"/> for menus. It engages the overlay on
-    /// entering the world and disengages on leaving (so audio systems can build/release their voices), and
-    /// ticks it so the sensing systems stay live.
+    /// Owns the one world overlay and the world keyboard while the player is in the isometric scene, the
+    /// world-layer counterpart to <see cref="Nav.ScreenManager"/> for menus. Being in the free-roam world IS
+    /// owning the keyboard: whenever the view reads CLEAR with the player in control and no menu screen
+    /// taking it, this takes the same one lever the menu navigator uses (mutes <c>InControl</c> wholesale)
+    /// and re-provides the world keys below it, restoring the lever on leaving. It engages the overlay on
+    /// entering the world and disengages on leaving (so audio systems build/release their voices), glides the
+    /// cursor from the held movement vector, and runs the <see cref="WalkInteract"/> verb.
     ///
-    /// Live cursor keybindings are not wired yet — the world keyboard-ownership model is a deliberate
-    /// follow-up — so movement is zero here and the cursor is exercised through the dev hooks below until
-    /// that lands. The seam (player position, navmesh clamp, readout) is what this chunk proves.
+    /// The <c>Dev*</c> hooks remain only as dev-server introspection; the live keys are wired through the
+    /// module's input registry (the registration and the held-glide read live in <see cref="UiModule"/>,
+    /// which owns the one <c>InputManager</c>).
     /// </summary>
     public sealed class WorldReader : IDisposable
     {
-        /// <summary>The live reader, for dev-server introspection/driving while live keys are pending.</summary>
+        /// <summary>The cursor glide rate, metres per second.</summary>
+        private const float GlideSpeed = 4f;
+        // How near the cursor must be to an actionable thing's body for Enter to target it rather than walk
+        // to bare ground. Generous, because the freeform cursor is navmesh-clamped and a thing's body can sit
+        // off the mesh (a door in a wall, a prop on a ledge), so the cursor only ever gets near it.
+        private const float SnapRadius = 2.5f;
+
+        /// <summary>The live reader, for dev-server introspection/driving.</summary>
         public static WorldReader Active;
 
         private readonly IModHost _host;
@@ -29,7 +41,12 @@ namespace DiscoAccess.Module.World
         private readonly Overlay _overlay;
         private readonly SpatialSystem _spatial;
         private readonly WorldModel _model = new WorldModel();
+        private readonly WalkInteract _walk;
         private bool _engaged;
+        private bool _ownsKeyboard;
+        private bool _wasOwning;
+        private bool _wasGliding;
+        private bool _inWorld; // the frame's view read, resolved in ResolveOwnership and reused in Tick
         private bool _viewReadyOnce;
         private bool _warnedViewThrow;
         private IWallTones _devTones;
@@ -43,22 +60,114 @@ namespace DiscoAccess.Module.World
             // Until the settings menu wires the world systems, the cursor readout is simply on.
             _spatial.BindMode(() => PlayMode.Continuous);
             _overlay.With(_spatial);
+            _walk = new WalkInteract(host);
             Active = this;
         }
 
-        /// <summary>Engage/disengage on world entry/exit and tick the overlay while in the world.</summary>
-        public void Tick()
-        {
-            bool inWorld = InWorld();
-            if (inWorld && !_engaged) { _overlay.OnEnter(); _engaged = true; }
-            else if (!inWorld && _engaged) { _overlay.OnExit(); _engaged = false; }
-            if (!inWorld) return;
+        /// <summary>Whether the world owns the keyboard this frame (the input layer gates the World category
+        /// on it). Set by <see cref="ResolveOwnership"/> before input is polled.</summary>
+        public bool OwnsKeyboard => _ownsKeyboard;
 
-            // Refresh the world registry (the sonar/scanner data layer), then tick the overlay. No live
-            // movement keys yet; the zero vector keeps motion tracking and the systems current.
+        /// <summary>Resolve keyboard ownership for this frame and take/restore the InControl lever. Call
+        /// before polling input, after the screen manager has resolved its own ownership: a menu screen, the
+        /// mod menu, or a popup is authoritative, so the world yields to it (<paramref name="screensOwn"/>),
+        /// and otherwise owns the keyboard while in free-roam with control.</summary>
+        public void ResolveOwnership(bool screensOwn)
+        {
+            // Read the view once here and reuse it in Tick this frame (the value is frame-stable, and the
+            // bridge read enters a try/catch on the per-frame pump). ResolveOwnership always runs before Tick.
+            _inWorld = InWorld();
+            bool own = !screensOwn && _inWorld && _overlay.HasControl;
+
+            // A committed walk that outlives our control (a script grabbed the character, the area unloaded)
+            // is abandoned silently - the player did not ask to stop, so no spoken cancel.
+            if (!own && _wasOwning) _walk.Abandon();
+
+            // Mute InControl wholesale and re-provide our keys below it: targeted mutes do not take, so the
+            // model is all-or-nothing (same lever the menu navigator uses). Reasserted each owning frame (the
+            // game re-enables InControl on focus/device changes); handed back exactly once when we stop, but
+            // never while a menu owns it, so we don't fight the lever the screen manager just took.
+            if (own) InControl.InputManager.Enabled = false;
+            else if (_wasOwning && !screensOwn) InControl.InputManager.Enabled = true;
+
+            _wasOwning = own;
+            _ownsKeyboard = own;
+        }
+
+        /// <summary>Engage/disengage on world entry/exit, refresh the registry, and - while we own the
+        /// keyboard - glide the cursor by the held vector (<paramref name="dirX"/> east, <paramref name="dirZ"/>
+        /// north) and advance the interact verb. Call after input is polled.</summary>
+        public void Tick(float dirX, float dirZ)
+        {
+            bool inWorld = _inWorld; // resolved this frame by ResolveOwnership, which always runs first
+            if (inWorld && !_engaged) { _overlay.OnEnter(); _engaged = true; }
+            else if (!inWorld && _engaged) { _overlay.OnExit(); _engaged = false; _walk.Abandon(); }
+            if (!inWorld) { _wasGliding = false; return; }
+
             float dt = Time.unscaledDeltaTime;
-            _model.Tick(dt);
-            _overlay.Tick(dt, 0f, 0f, 0f);
+            _model.Tick(dt); // the sonar/scanner data layer, kept current whether or not we drive
+
+            if (!_ownsKeyboard)
+            {
+                // In the world but not driving (a conversation or cutscene: CLEAR without control). Keep the
+                // systems and motion tracking current without moving the cursor.
+                _overlay.Tick(dt, 0f, 0f, 0f);
+                _wasGliding = false;
+                return;
+            }
+
+            _overlay.Tick(dt, dirX, dirZ, GlideSpeed);
+            // Read the cursor's new spot when a glide stroke ends (keys released) - the natural "where am I
+            // now" - rather than every frame, which would be a wall of speech.
+            bool gliding = dirX != 0f || dirZ != 0f;
+            if (_wasGliding && !gliding) _overlay.AnnounceCurrent();
+            _wasGliding = gliding;
+
+            _walk.Tick();
+        }
+
+        /// <summary>Snap the cursor back onto the character and read the new spot (the recenter key).</summary>
+        public void Recenter() => _overlay.Recenter();
+
+        /// <summary>Cancel a committed walk and stop the character (the Stop key).</summary>
+        public void Cancel() => _walk.Cancel();
+
+        /// <summary>Walk-then-interact at the cursor: interact with the nearest actionable thing under the
+        /// cursor, or walk to the bare ground there when nothing is close (the Enter verb).</summary>
+        public void Interact()
+        {
+            if (!_engaged) return;
+            Snv cursor = _overlay.Cursor.Position;
+            Snv player = _overlay.Cursor.PlayerPosition;
+            EntityProxy target = NearestActionableTo(cursor);
+            // One reachability-oracle call, on the single chosen target. Reachable: walk to its stand-point
+            // and interact. Unreachable: the cursor sits on walkable ground regardless, so walk there (getting
+            // closer can make the thing reachable for a follow-up Enter) and name it so the player learns it
+            // is there, rather than leaving a dead zone where Enter does nothing. No target near the cursor:
+            // a plain walk to the spot.
+            if (target != null && target.IsActionable(player))
+                _walk.BeginInteract(target, player);
+            else if (target != null)
+                _walk.BeginWalk(cursor, Strings.WorldUnreachable(target.Name));
+            else
+                _walk.BeginWalk(cursor, Strings.WorldWalking);
+        }
+
+        // The nearest actionable entity whose body sits within the snap radius of the cursor, or null for a
+        // bare-ground cursor. Selection measures to the body (cheap) and filters on the IsAccessible gate;
+        // the reachability oracle and stand-point are only consulted for the one chosen target (in
+        // WalkInteract), never the whole set. Orbs are skipped - orb interaction is deferred (camera-follow).
+        private EntityProxy NearestActionableTo(Snv cursor)
+        {
+            EntityProxy best = null;
+            float bestDist = SnapRadius;
+            foreach (var item in _model.Items)
+            {
+                if (!item.IsAccessible || !(item is EntityProxy ep)) continue;
+                float d = Snv.Distance(item.Position, cursor);
+                if (d <= bestDist) { bestDist = d; best = ep; }
+            }
+            return best;
         }
 
         // The plain in-game world is the CLEAR view. Confirmed live: during free-roam ViewsPagesBridge.Current

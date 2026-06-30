@@ -23,6 +23,30 @@ namespace DiscoAccess.Module.World
         public bool IsAccessible => _e.IsAccessible;
         public bool IsVisible => true; // present in the scene; fog/streaming refinement comes later
 
+        // The interaction stand-point and the reachability oracle, both approach-relative (computed from the
+        // querying position). GameEntity, which BasicEntity derives from, supplies both; the from-position
+        // becomes the Formation.Location the game measures the approach from.
+        public Vector3 InteractionPoint(Vector3 from)
+            => WorldConvert.ToSnv(_e.GetInteractionLocation(LocationAt(from)).position);
+
+        public bool IsActionable(Vector3 from) => _e.CheckIfCanCreatePathToHavePath(LocationAt(from));
+
+        // Extra facts the Enter walk-then-interact verb needs beyond the sensing contract: the stand-point's
+        // facing (so the character ends up looking the right way) and the game's own arrival-range test. Kept
+        // here so the game-call and Unity<->Numerics conversion stay inside the proxy boundary.
+        internal Vector3 Approach(Vector3 from, out float heading)
+        {
+            Formation.Location loc = _e.GetInteractionLocation(LocationAt(from));
+            heading = loc.heading;
+            return WorldConvert.ToSnv(loc.position);
+        }
+
+        internal bool WithinInteractionRadius(Vector3 playerPos)
+            => _e.IsWithinInteractionRadius(WorldConvert.ToUnity(playerPos));
+
+        private static Formation.Location LocationAt(Vector3 from)
+            => new Formation.Location(WorldConvert.ToUnity(from), 0f);
+
         public bool Interact() => _e.Interact(new Interactable.ClickEventData());
 
         // Map the entity's runtime type onto a taxonomy category. Order matters where types nest (Curtains

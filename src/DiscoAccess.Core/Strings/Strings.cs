@@ -24,6 +24,34 @@ namespace DiscoAccess.Core.Strings
         public const string InputJumpLast = "Jump to last";
         public const string InputSecondary = "Secondary action";
         public const string InputModMenu = "Open mod menu";
+        // The world keymap: the cursor glide, the recenter, the walk-then-interact verb, and its cancel.
+        public const string InputWorldMoveNorth = "Move cursor north";
+        public const string InputWorldMoveSouth = "Move cursor south";
+        public const string InputWorldMoveEast = "Move cursor east";
+        public const string InputWorldMoveWest = "Move cursor west";
+        public const string InputWorldRecenter = "Recenter cursor on character";
+        public const string InputWorldInteract = "Walk and interact";
+        public const string InputWorldStop = "Stop";
+        // The world's information-screen, pause, and help keys.
+        public const string InputWorldInventory = "Open inventory";
+        public const string InputWorldCharacterSheet = "Open character sheet";
+        public const string InputWorldJournal = "Open journal";
+        public const string InputWorldThoughtCabinet = "Open thought cabinet";
+        public const string InputWorldMap = "Open map";
+        public const string InputWorldPause = "Pause menu";
+        public const string InputWorldHelp = "Help";
+        // The world's gameplay quick-actions.
+        public const string InputWorldHealHealth = "Heal health";
+        public const string InputWorldHealMorale = "Heal morale";
+        public const string InputWorldLeftHandItem = "Use left-hand item";
+        public const string InputWorldRightHandItem = "Use right-hand item";
+        public const string InputWorldQuickSave = "Quick save";
+        public const string InputWorldQuickLoad = "Quick load";
+        public const string InputWorldLanguage = "Cycle language";
+        // The world's status-readout keys.
+        public const string InputWorldReadTime = "Read time";
+        public const string InputWorldReadMoney = "Read money";
+        public const string InputWorldReadHealth = "Read health";
 
         // Control role words, spoken after a control's label so the user knows what it is.
         public const string RoleButton = "button";
@@ -296,5 +324,55 @@ namespace DiscoAccess.Core.Strings
 
         // The world sensing systems' names, spoken in the settings menu. Authored (the mod's own systems).
         public const string WorldSystemSpatial = "cursor position";
+
+        // The walk-then-interact verb's spoken feedback. The mod authors these (DE has no equivalent line):
+        // committing a walk, the bare-ground walk with no target, the reachability refusal, and the cancel.
+        // Name-first so the varying part lands first; the status word follows.
+
+        /// <summary>Spoken on committing the walk-then-interact verb toward a named target.</summary>
+        public static string WorldWalkingTo(string name)
+            => string.IsNullOrEmpty(name) ? WorldWalking : name + ", walking";
+
+        /// <summary>Spoken on walking to a bare-ground spot with no target.</summary>
+        public const string WorldWalking = "walking";
+
+        /// <summary>Spoken when the target cannot be pathed to from where the character currently stands.</summary>
+        public static string WorldUnreachable(string name)
+            => string.IsNullOrEmpty(name) ? "can't reach" : name + ", can't reach";
+
+        /// <summary>Spoken when the player cancels a committed walk.</summary>
+        public const string WorldStopped = "stopped";
+
+        // ---- World status readouts (mod-authored; the game has no spoken equivalent) ----
+
+        // The wallet total. The game stores money in centims (100 = one réal) and its on-screen formatter
+        // prefixes a réal glyph the reader cannot speak, so the readout is composed here from the raw value.
+        public static string WorldMoney(int centims)
+            => (centims / 100) + "." + (centims % 100).ToString("D2") + " réal";
+
+        // The two health bars (the game's own Health and Morale, not the Endurance/Volition skills that set
+        // their maximums), each current of maximum, plus the count of assigned healing charges. The bar names
+        // are passed in from the game so they localize; the rest is composed here.
+        public static string WorldHealth(string healthName, int healthCurrent, int healthMax, int healthCharges,
+                                         string moraleName, int moraleCurrent, int moraleMax, int moraleCharges)
+            => healthName + " " + healthCurrent + "/" + healthMax + ", " + HealCharges(healthCharges)
+             + "; " + moraleName + " " + moraleCurrent + "/" + moraleMax + ", " + HealCharges(moraleCharges);
+
+        /// <summary>A count of assigned healing charges, singular/plural.</summary>
+        public static string HealCharges(int count) => count == 1 ? "1 healing charge" : count + " healing charges";
+
+        // ---- World quick-action feedback (mod-authored; the game speaks none of these). The heal feedback
+        // is composed around the game's bar name (Health/Morale) so it localizes. ----
+        public static string WorldBarHealed(string barName) => barName + " healed";
+        public static string WorldBarFull(string barName) => barName + " full";
+        public static string WorldNoBarHeal(string barName) => "no " + barName + " items";
+        public const string WorldUsedLeftHand = "used left hand item";
+        public const string WorldUsedRightHand = "used right hand item";
+        public const string WorldLeftHandEmpty = "left hand empty";
+        public const string WorldRightHandEmpty = "right hand empty";
+        public const string WorldQuickSaved = "quick saved";
+        public const string WorldQuickLoading = "quick loading";
+        public const string WorldNoQuickSave = "no quick save";
+        public const string WorldLanguageChanged = "language changed";
     }
 }

@@ -1,0 +1,41 @@
+namespace DiscoAccess.Module.World
+{
+    /// <summary>
+    /// The keys of the world-category input actions. The module registers <c>InputAction</c>s under these
+    /// (in <see cref="DiscoAccess.Core.Input.InputCategory.World"/>); the glide keys are polled as a held
+    /// vector each frame, while the verbs fire the <see cref="WorldReader"/>'s handlers. The counterpart to
+    /// <see cref="DiscoAccess.Core.UI.Nav.UiActions"/> for the isometric world.
+    /// </summary>
+    internal static class WorldActions
+    {
+        public const string MoveNorth = "world.move.north";
+        public const string MoveSouth = "world.move.south";
+        public const string MoveEast = "world.move.east";
+        public const string MoveWest = "world.move.west";
+        public const string Recenter = "world.recenter";
+        public const string Interact = "world.interact";
+        public const string Stop = "world.stop";
+
+        // Information screens, pause, help.
+        public const string OpenInventory = "world.inventory";
+        public const string OpenCharacterSheet = "world.charsheet";
+        public const string OpenJournal = "world.journal";
+        public const string OpenThoughtCabinet = "world.thoughtcabinet";
+        public const string Pause = "world.pause";
+        public const string Help = "world.help";
+
+        // Gameplay quick-actions.
+        public const string HealEndurance = "world.heal.endurance";
+        public const string HealVolition = "world.heal.volition";
+        public const string LeftHandItem = "world.hand.left";
+        public const string RightHandItem = "world.hand.right";
+        public const string QuickSave = "world.quicksave";
+        public const string QuickLoad = "world.quickload";
+        public const string Language = "world.language";
+
+        // Status readouts.
+        public const string ReadTime = "world.read.time";
+        public const string ReadMoney = "world.read.money";
+        public const string ReadHealth = "world.read.health";
+    }
+}

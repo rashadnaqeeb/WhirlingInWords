@@ -10,12 +10,16 @@ line-by-line against the WOTR source; the divergences recorded below are deliber
 
 ## What it does today
 
-A blind player can already, through the dev hooks, move a freeform cursor around the isometric scene
-and hear its position relative to the character ("northeast, 2 meters"), with the cursor clamped to
-walkable ground so it cannot leave the floor. Underneath, a live registry classifies every entity in
-the area and filters it down to the actionable set, and an audio engine can place stereo cues. What is
-missing to make this player-facing is the keyboard model (live cursor keys) and the sensing systems
-that turn the registry and the audio engine into sonar and wall tones.
+A blind player can move a freeform cursor around the isometric scene with the live world keys and hear
+its position relative to the character ("northeast, 2 meters"), with the cursor clamped to walkable
+ground so it cannot leave the floor; press Enter to walk the character to the thing under the cursor and
+interact (a conversation, a container, an exit) or to bare ground; and reach the game's information
+screens, the pause and help menus, the status readouts (time, money, health), and the gameplay
+quick-actions through the world keymap. The navigation model below is wired: being in the world owns the
+keyboard the same way a migrated menu does. Underneath, a live registry classifies every entity in the
+area and filters it down to the actionable set, and an audio engine can place stereo cues. What is still
+missing to make the world fully legible is the leaf sensing systems (the sonar, wall tones, the scanner)
+that turn the registry and the audio engine into a sense of what surrounds the cursor.
 
 ## Architecture
 
@@ -181,17 +185,198 @@ in the Module.
 ## Dev hooks
 
 `WorldReader` exposes a set of `Dev*` methods (and a static `Active` reference) so the dev server can
-drive and inspect the cursor, the audio engine, and the registry while live keybindings are pending.
-These are validation scaffolding, not a player feature; they will be pruned or replaced when the
-keyboard model lands.
+drive and inspect the cursor, the audio engine, and the registry. With the keyboard model now wired,
+these are introspection and headless-validation scaffolding (a backgrounded window receives no OS keys,
+so the live keys cannot be exercised through the dev server), not a player feature.
+
+## The navigation model
+
+The keyboard-ownership and interaction model was the deferred fork above the infrastructure; it is now
+built and wired, and validated live in the Whirling backyard (glide to Yard Cuno and Enter starts his
+conversation; the walled-off Yard Woodpile reads unreachable; the screen, status, and quick-action keys
+all fire through the real input registry). It lives in three Module pieces: `WorldReader` promoted to the
+world's keyboard owner, `WalkInteract` (the Enter state machine), and `WorldCommands` (the game-acting
+hotkeys: screens, pause/help, status reads, quick-actions). The cursor verbs and the held glide are
+read in `UiModule` alongside the menu input, under a new `InputCategory.World` that is live only while
+the world owns the keyboard.
+
+### Keyboard ownership: the world is the largest migrated screen
+
+Being in the isometric world is owning the keyboard, the same way a migrated menu screen owns it. There
+is no toggle mode to enter or leave. Whenever `ViewsPagesBridge.Current` reads `CLEAR`, `WorldReader`
+takes the same one lever `ScreenManager` uses for menus, `InControl.InputManager.Enabled = false`,
+reasserted each frame, and restores it on leaving the world. That lever is all-or-nothing: it mutes
+every game key at once (scouting confirmed targeted mutes do not take), so the model is to mute the game
+wholesale and re-provide each key we want. Our own keys poll `UnityEngine.Input` directly, below
+InControl, so they keep working while the game's are dead; our actions call the game's APIs directly
+(`Character.SetDestination`, `entity.Interact`), never through input, the same pattern the menu navigator
+uses for `NavigationManager.Select`. A blind player gets nothing from the live camera or click
+underneath, so there is no vanilla play to preserve, which is what makes the wholesale mute the right
+choice over fragile per-key blocking.
+
+The cost of muting everything is that every game action we still want needs its own binding. That is the
+keymap below.
+
+### The keymap
+
+Cursor and interaction:
+- W A S D glide the cursor on the ground plane (W north, S south, A west, D east), navmesh-clamped.
+- C recenters the cursor on the character.
+- Enter walks the character to the cursor's target and interacts (the walk-then-interact verb below); on
+  bare ground it just walks there.
+- Space cancels the current walk and stops movement (the game's `StopMovement`), so a committed Enter is
+  abortable mid-path.
+
+Information screens, the game's own hotkey letter plus Ctrl: Ctrl+I inventory, Ctrl+C character sheet,
+Ctrl+J journal, Ctrl+T thought cabinet. Each opens the game's own view by invoking its HUD menu button's
+click, and our screen reader then drives it; Escape (the screen's Back) closes it. Escape opens the pause
+menu and F1 opens help, both through the game's own `ViewController.ToggleView`. There is no map key: the
+map has no standalone view (it is a sub-page inside the journal, reachable via Ctrl+J), so a dedicated key
+would need fragile cross-frame sub-page navigation for no access the journal does not already give. The
+mod settings menu stays on Ctrl+M (the planned F12 move was only to free Ctrl+M for the dropped map key).
+
+Gameplay quick-actions with no screen of their own:
+- Left and Right arrow use a healing charge on the Health and Morale bars (matching the controller dpad's
+  left and right), via the game's healing pools; refused, with feedback, when there is no charge or the
+  bar is already full, so a charge is never wasted.
+- 1 and 2 use the left-hand and right-hand equipped items (`InventoryLuaFunctions.UseSubstanceInHand`); an
+  empty hand reads as such.
+- F5 and F8 quicksave and quickload through the game's persistence API (quickload refused when no
+  quicksave exists).
+- Ctrl+L cycles language, global, in the world and in menus (the game's bare-key binding was killed by
+  type-ahead, so it is restored here under Ctrl), then speaks the new language's own name.
+
+Status:
+- T reads the time (the game's own day-and-hour string), M reads money, H reads the two bars Health and
+  Morale, each current of maximum with its count of healing charges. Each press re-reads. Plain keys,
+  distinct by modifier from Ctrl+T (thought cabinet). The bars are named by the game's Health/Morale terms,
+  not the Endurance/Volition skills that set their maximums.
+
+Reserved for the leaf systems:
+- Tab and Shift+Tab cycle the scanner through interactables when that system lands.
+- Up and Down arrow, and Q, are currently unassigned in the world.
+
+Talk-to-Kim is intentionally dropped: you reach the same conversation by walking to Kim and interacting,
+so it needs no dedicated key.
+
+### Enter: walk-then-interact
+
+`Interact()` does not walk the character. Confirmed live: calling it on a container 11 meters off
+returned false and the character did not move; it interacts in place and refuses when out of range,
+playing a fail animation. The walk-then-interact fusion lives in the game's click handler, not in
+`Interact()`, so Enter orchestrates it itself, with every piece proven live:
+
+1. Target the entity's `GetInteractionLocation(currentLocation)` stand-point, never its raw
+   `transform.position`. Many entities sit off the navmesh, doors embedded in walls, props up on ledges,
+   so the raw position is unreachable; the stand-point is the game's designated on-navmesh approach spot.
+2. `SetDestination` to the stand-point with `MovementMode.AUTOMATIC` (see Movement speed), watching
+   `movementStatus` for arrival.
+3. `Interact(new Interactable.ClickEventData())` once `IsWithinInteractionRadius` is true.
+
+Both ends are confirmed live. Out of range, `Interact` returns false and the character stays put (the
+woodpile at 11 meters). On arrival at a reachable target's stand-point it returns true and the
+interaction begins: walking Harry to Yard Cuno's stand-point, `Interact` returned true once inside the
+radius and a real conversation started (`isConversationActive`). Conversations do not change the view,
+`ViewsPagesBridge.Current` stays `CLEAR` while one runs, which is why the world layer gates on
+`HasControl` (no active conversation) on top of the `CLEAR` view.
+
+Orbs and physical objects share this one path. An orb's clickable (`OrbUiElement`) only activates once
+the character is inside the `SenseOrb`'s `InteractionRadius`, but the `SenseOrb` is already in the
+registry at its world position while out of range, so the cursor can navigate to it before it is
+clickable. Confirmed live: `IsOrbiting` flips exactly at the `InteractionRadius` (false at 3.5 meters,
+true at 3.0 for a radius-3 orb), and crossing the radius only makes the orb appear, it does not auto-fire
+the conversation. The clickable `OrbUI` carries a second gate, the orb must be rendered (the camera on
+it); a distance-only approach with the camera elsewhere leaves the orb in range (`IsOrbiting` true) but
+its `OrbUI` still inactive. In normal play the two coincide because the camera follows the character,
+which is why camera-follow (Deferred) is required for orb interaction, not only for streaming. On bare
+ground with no target, Enter is just `SetDestination`.
+
+### Reachability is the game's own oracle, not ours
+
+Before committing the walk, Enter checks reachability with the game's
+`CheckIfCanCreatePathToHavePath(currentLocation)`. Do not roll our own `NavMesh.CalculatePath` to the
+entity's body: an NPC's feet can sit on an off-mesh sliver, which produces false negatives (this falsely
+reported the talkable Cunoesse as unreachable during testing). The game oracle tests the interaction
+stand-point, which is what actually determines whether you can act, and it matches what is interactable
+in real play. If it returns false, Enter announces the target cannot be reached from here rather than
+walking partway and failing silently.
+
+`IsAccessible` is not a reachability guarantee. The Yard Woodpile reads `IsAccessible = true` yet is
+walled off from the backyard navmesh; its stand-point is on a separate navmesh component
+(`CheckIfCanCreatePathToHavePath` false, confirmed by the game's own check and three independent navmesh
+measurements). So reachability is always a live per-position check, never cached and never inferred from
+`IsAccessible`; a thing unreachable from here can become reachable once the character has moved.
+
+### Talk-across-barrier, and position versus actionability
+
+The stand-point sits on the player's side of a barrier, so a fenced NPC is talkable without being
+reachable, and Enter handles it with no special-casing. Cunoesse's body is 5.6 meters away behind a
+fence (a `PathPartial`, unreachable), but her interaction stand-point is 3.9 meters on Harry's side (a
+`PathComplete`); you walk to the stand-point and converse across the fence, exactly as a sighted player
+does. So an entity's spoken position and its actionability are two independent facts: position describes
+where the body is, for the player's spatial map; actionability is the oracle's verdict on the
+stand-point. They can disagree, Cunoesse reads far and behind a fence yet is fully actionable, the
+woodpile reads closer yet is not.
+
+### The interaction point is what the player-facing tools represent
+
+Every actionable interactable is represented to the player by its interaction point
+(`GetInteractionLocation`), not its body: the sonar pings it, the scanner targets it, and the spoken
+go-here distance and bearing measure to it. That is the point the player navigates to in order to act,
+it sits on reachable ground, and it dissolves the barrier case (Cunoesse pings at her reachable
+talk-spot, not her unreachable body), so following any cue leads to a successful interaction. The point
+is approach-relative, recomputed from the querying position, so it is a live navigation target rather
+than a fixed landmark; in practice it holds still as you walk straight at a thing and only shifts if a
+better approach side opens. Computing it is heavier than reading a transform, so it is done for the
+sonar's current sweep set and on scanner navigation, throttled, not for the whole accessible set every
+frame.
+
+The body position is kept for two narrow uses: the free-glide exploration cursor's spatial readout (what
+is physically around you, the look-around sense), and locating a genuinely-unreachable thing to announce
+it as behind a wall. So the proxy exposes three facts per item: `Position` (the body), `InteractionPoint`,
+and `IsActionable` (the oracle's verdict). The actionable tools key off the interaction point; the
+exploration cursor keys off the body.
+
+### Movement speed
+
+`SetDestination` takes a `MovementMode` (`AUTOMATIC`, `RUN`, `WALK`, `INSTANT`, `TELEPORT`). Enter passes
+`AUTOMATIC`, which behaves identically to a vanilla click: the game's own policy decides walk versus run,
+honoring the player's run preference and any scripted spot where the game wants careful movement. We
+never hardcode `RUN`. There is no stamina cost to running, but some scripted moments reward moving
+slowly, so forcing run would both break parity and risk overriding those; `AUTOMATIC` keeps us safe by
+deferring to the game. An always-run preference, if wanted, is exposed through the game's own setting
+mirrored in the mod menu, not forced per path, so it too stays subject to the game's contextual
+overrides.
+
+### What this changed in the code
+
+`WorldReader` was promoted from a dev-driven cursor host to a real keyboard owner: `ResolveOwnership`
+runs each frame before input is polled and, while the view is `CLEAR` with control and no menu screen
+taking it, takes the InControl lever (yielding to the screen manager, which is authoritative), and the
+held glide vector and the cursor verbs are read in `UiModule` under `InputCategory.World`, live only
+while the world owns the keyboard. The lever is restored on leaving, never fighting the screen manager's.
+The `Dev*` hooks remain only as introspection. The proxies (`EntityProxy`, `OrbProxy`) gained
+`InteractionPoint(from)` and `IsActionable(from)`, both approach-relative and reading live through
+`GetInteractionLocation` and `CheckIfCanCreatePathToHavePath` (an orb has no stand-point, so it reports
+its body and is not actionable). The Enter verb is `WalkInteract`, a small arrival-watching state machine
+(target the stand-point, drive `SetDestination` with `AUTOMATIC`, watch `movementStatus`, `Interact` on
+arrival), cancellable by Space. The game-acting hotkeys (screens, pause/help, status reads,
+quick-actions) live in `WorldCommands`, each calling the game's own method directly since the wholesale
+mute leaves no key for the game to read.
 
 ## Deferred
 
 These are real forks left open on purpose, not oversights.
 
-- The world keyboard-ownership / focus-mode model. How the player enters and exits world navigation, and
-  how the cursor keys coexist with the game's own hotkeys, is a UX decision to make before wiring live
-  keys. Until then the cursor is driven through the dev hooks.
+- The held-glide and physical-keypress path is exercised in the design's mechanism but not through real
+  OS keys in the headless dev harness: a backgrounded window receives no OS key events, and the dev
+  server drives the menu navigator, not the world's raw-key poll. The cursor verbs and every game-acting
+  handler were validated by firing their registered `InputAction` directly through the live `InputManager`
+  (and the glide through the overlay), which exercises the same code a key would; the one unverified link
+  is `Input.GetKey`/`GetKeyDown` itself returning for a held W or a pressed Enter, which uses the same
+  poll the working menu keys do. Worth a sighted confirmation pass on a focused window.
+- The dedicated map key. The map has no standalone view (it is a journal sub-page), so a Ctrl+M map key
+  would need cross-frame sub-page navigation; dropped, since the map is reachable through Ctrl+J's journal.
 - The leaf sensing systems: the sonar sweep, wall tones as a real system, and the scanner / review
   cursor. The infrastructure is shaped for them; they are the next features. The sonar must suppress
   out-of-sight things (those behind a wall from the cursor), or it is annoying; the gate is a navmesh
@@ -204,7 +389,10 @@ These are real forks left open on purpose, not oversights.
 - Bounds refinement: doorway segments and footprint circles. Every proxy currently reports a point
   bound; the richer shapes exist in `ScanBounds` but are not yet wired to the proxies.
 - Name cleaning and the spoiler-safe fallback for slug names, per the naming rules in the scouting notes.
-- Camera follow, so orbs stream in around the cursor as it explores.
+- Camera follow, so orbs stream in around the cursor as it explores. This is also required for orb
+  interaction, not only reveal: an orbital orb's clickable `OrbUI` activates only when the orb is
+  rendered, so the camera must be on a target before its orb can be interacted with (confirmed live, the
+  in-range `IsOrbiting` flag flips at the radius but `OrbUI` stays inactive without the camera).
 - Recentering the cursor onto the player when an area is entered.
 
 ## Validation snapshot

@@ -16,14 +16,14 @@ namespace DiscoAccess.Core.World
         /// lateral offset; far out it saturates toward the bearing. <paramref name="panWidth"/> is the
         /// crossover distance. Coincident (dist ~ 0) reads centred.</summary>
         public static float Pan(float dx, float dist, float panWidth)
-            => dist > 1e-3f ? Clamp(dx / Math.Max(dist, panWidth), -1f, 1f) : 0f;
+            => dist > 1e-3f ? WorldMath.Clamp(dx / Math.Max(dist, panWidth), -1f, 1f) : 0f;
 
         /// <summary>Volume in [<paramref name="floor"/>, 1] falling with distance on the curve
         /// refDist / (refDist + dist): full at the thing, half a reference-distance away, never below the
         /// floor so a far-but-revealed thing stays faintly audible. The per-system and master volumes scale
         /// this on top.</summary>
         public static float DistanceVolume(float dist, float refDist, float floor)
-            => Clamp(refDist / (refDist + dist), floor, 1f);
+            => WorldMath.Clamp(refDist / (refDist + dist), floor, 1f);
 
         /// <summary>Wall-tone proximity volume in [0, 1]: 0 at or beyond <paramref name="range"/>, rising
         /// quadratically to 1 right at the wall, so it bites close in and stays quiet at the edge of
@@ -40,8 +40,6 @@ namespace DiscoAccess.Core.World
         /// spacious and a crowd compresses toward the floor (the whole sweep lengthens, nothing is
         /// dropped).</summary>
         public static float SweepGap(int count, float spread, float gapMin, float gapMax)
-            => Clamp(spread / Math.Max(1, count), gapMin, gapMax);
-
-        private static float Clamp(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
+            => WorldMath.Clamp(spread / Math.Max(1, count), gapMin, gapMax);
     }
 }

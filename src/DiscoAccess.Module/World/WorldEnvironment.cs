@@ -22,7 +22,7 @@ namespace DiscoAccess.Module.World
             get
             {
                 Character main = Main;
-                return main != null ? ToSnv(main.transform.position) : default;
+                return main != null ? WorldConvert.ToSnv(main.transform.position) : default;
             }
         }
 
@@ -35,11 +35,11 @@ namespace DiscoAccess.Module.World
         /// else snap the target onto the mesh so the cursor never leaves the floor.</summary>
         public Snv TraceMove(Snv from, Snv intended)
         {
-            Vector3 f = ToUnity(from), t = ToUnity(intended);
+            Vector3 f = WorldConvert.ToUnity(from), t = WorldConvert.ToUnity(intended);
             if (NavMesh.Raycast(f, t, out NavMeshHit boundary, AllAreas))
-                return ToSnv(boundary.position);
+                return WorldConvert.ToSnv(boundary.position);
             if (NavMesh.SamplePosition(t, out NavMeshHit snapped, 1.5f, AllAreas))
-                return ToSnv(snapped.position);
+                return WorldConvert.ToSnv(snapped.position);
             return intended;
         }
 
@@ -50,8 +50,5 @@ namespace DiscoAccess.Module.World
         {
             get { Party party = Party.Player; return party != null ? party.Main : null; }
         }
-
-        private static Snv ToSnv(Vector3 v) => new Snv(v.x, v.y, v.z);
-        private static Vector3 ToUnity(Snv v) => new Vector3(v.X, v.Y, v.Z);
     }
 }

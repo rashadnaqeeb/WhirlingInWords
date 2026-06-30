@@ -10,10 +10,10 @@ using PlayMode = DiscoAccess.Core.World.Overlays.PlayMode; // disambiguate from 
 namespace DiscoAccess.Module.World
 {
     /// <summary>
-    /// Owns the one world overlay and drives it each frame while the player is in the isometric scene (the
-    /// LOBBY view), the world-layer counterpart to <see cref="Nav.ScreenManager"/> for menus. It engages the
-    /// overlay on entering the world and disengages on leaving (so audio systems can build/release their
-    /// voices), and ticks it so the sensing systems stay live.
+    /// Owns the one world overlay and drives it each frame while the player is in the isometric scene, the
+    /// world-layer counterpart to <see cref="Nav.ScreenManager"/> for menus. It engages the overlay on
+    /// entering the world and disengages on leaving (so audio systems can build/release their voices), and
+    /// ticks it so the sensing systems stay live.
     ///
     /// Live cursor keybindings are not wired yet — the world keyboard-ownership model is a deliberate
     /// follow-up — so movement is zero here and the cursor is exercised through the dev hooks below until
@@ -24,14 +24,19 @@ namespace DiscoAccess.Module.World
         /// <summary>The live reader, for dev-server introspection/driving while live keys are pending.</summary>
         public static WorldReader Active;
 
+        private readonly IModHost _host;
         private readonly IAudioEngine _audio;
         private readonly Overlay _overlay;
         private readonly SpatialSystem _spatial;
+        private readonly WorldModel _model = new WorldModel();
         private bool _engaged;
+        private bool _viewReadyOnce;
+        private bool _warnedViewThrow;
         private IWallTones _devTones;
 
         public WorldReader(IModHost host)
         {
+            _host = host;
             _audio = host.Audio;
             _overlay = new Overlay(new WorldEnvironment(), host.Speech);
             _spatial = new SpatialSystem();
@@ -49,18 +54,39 @@ namespace DiscoAccess.Module.World
             else if (!inWorld && _engaged) { _overlay.OnExit(); _engaged = false; }
             if (!inWorld) return;
 
-            // No live movement keys yet; ticking with a zero vector keeps motion tracking and the systems
-            // current so the dev hooks read a live overlay.
-            _overlay.Tick(Time.unscaledDeltaTime, 0f, 0f, 0f);
+            // Refresh the world registry (the sonar/scanner data layer), then tick the overlay. No live
+            // movement keys yet; the zero vector keeps motion tracking and the systems current.
+            float dt = Time.unscaledDeltaTime;
+            _model.Tick(dt);
+            _overlay.Tick(dt, 0f, 0f, 0f);
         }
 
-        // The plain in-game world is the CLEAR view (no menu/page up); a menu, dialogue, or cutscene is its
-        // own ViewType, and HasControl gates the finer cutscene/dialogue case on top. The bridge throws
-        // during early boot (no view system yet), which reads as "not in the world".
-        private static bool InWorld()
+        // The plain in-game world is the CLEAR view. Confirmed live: during free-roam ViewsPagesBridge.Current
+        // reads CLEAR steadily, and DevScan sees the full entity set; a menu, dialogue, or cutscene is its own
+        // ViewType. (The LOBBY value ScreenAdapter maps to the world-screen NAME is a different page state,
+        // not the free-roam view - do not switch this gate to LOBBY: it reads false while actually in-world.)
+        // HasControl gates the finer cutscene/dialogue case on top. The bridge throws during early boot (no
+        // view system yet) - expected and frequent - so that is swallowed; any other throw is logged once so a
+        // real failure (a post-update proxy change) surfaces without spamming the per-frame pump.
+        private bool InWorld()
         {
-            try { return ViewsPagesBridge.Current == ViewType.CLEAR; }
-            catch { return false; }
+            try
+            {
+                ViewType view = ViewsPagesBridge.Current;
+                _viewReadyOnce = true;
+                return view == ViewType.CLEAR;
+            }
+            catch (Exception e)
+            {
+                // Boot transients (before the view system ever comes up) are expected and silent; a throw
+                // after it has worked once is a real regression, logged a single time.
+                if (_viewReadyOnce && !_warnedViewThrow)
+                {
+                    _warnedViewThrow = true;
+                    _host.LogWarning("WorldReader: view read failed; world layer idle until it recovers: " + e.Message);
+                }
+                return false;
+            }
         }
 
         public void Dispose()
@@ -102,5 +128,33 @@ namespace DiscoAccess.Module.World
             _devTones.Update(new[] { n, s, e, w });
         }
         public void DevWallStop() { _devTones?.Dispose(); _devTones = null; }
+
+        // World-model validation: total items, per-category counts, and how many pass the IsAccessible gate
+        // (the doc's ~400 entities collapsing to ~90 actionable things).
+        public string DevScan()
+        {
+            var counts = new System.Collections.Generic.Dictionary<string, int>();
+            int total = 0, accessible = 0, accessibleByCat;
+            var accCounts = new System.Collections.Generic.Dictionary<string, int>();
+            foreach (var it in _model.Items)
+            {
+                total++;
+                counts.TryGetValue(it.Category, out int c); counts[it.Category] = c + 1;
+                if (it.IsAccessible)
+                {
+                    accessible++;
+                    accCounts.TryGetValue(it.Category, out accessibleByCat); accCounts[it.Category] = accessibleByCat + 1;
+                }
+            }
+            var sb = new System.Text.StringBuilder();
+            sb.Append("total=").Append(total).Append(" accessible=").Append(accessible).Append('\n');
+            foreach (var cat in DiscoAccess.Core.World.WorldTaxonomy.All)
+            {
+                counts.TryGetValue(cat, out int c);
+                accCounts.TryGetValue(cat, out int a);
+                sb.Append("  ").Append(cat).Append(": ").Append(c).Append(" (").Append(a).Append(" accessible)\n");
+            }
+            return sb.ToString();
+        }
     }
 }

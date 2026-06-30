@@ -1,0 +1,29 @@
+using DiscoAccess.Core.World;
+using Vector3 = System.Numerics.Vector3;
+
+namespace DiscoAccess.Module.World
+{
+    /// <summary>
+    /// The <see cref="IWorldItem"/> over a live <see cref="SenseOrb"/> (a clue/thought orb in the scene).
+    /// Content is the orb's full localized prose (<c>GetText</c>); a streamed-out orb reads
+    /// <see cref="OrbType.NONE"/> with empty text, so it is not yet visible.
+    /// </summary>
+    internal sealed class OrbProxy : IWorldItem
+    {
+        private readonly SenseOrb _orb;
+
+        public OrbProxy(SenseOrb orb) { _orb = orb; }
+
+        public string Name => _orb.GetText();
+        public Vector3 Position => WorldConvert.ToSnv(_orb.transform.position);
+        public ScanBounds Bounds => ScanBounds.Point(Position);
+        public string Category => WorldTaxonomy.Orb;
+
+        // Streamed-in orbs (orbType set) are knowable; streamed-out ghosts read NONE with no text.
+        public bool IsAccessible => _orb.orbType != OrbType.NONE;
+        public bool IsVisible => _orb.orbType != OrbType.NONE;
+
+        // Orbs are activated through their UI element, not a direct world interaction; deferred.
+        public bool Interact() => false;
+    }
+}

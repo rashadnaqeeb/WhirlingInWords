@@ -51,13 +51,6 @@ namespace DiscoAccess.Core.World.Overlays
         public T? Get<T>() where T : OverlaySystem
             => _byType.TryGetValue(typeof(T), out var s) ? (T)s : null;
 
-        /// <summary>The system with the given settings key (e.g. "sonar"), or null.</summary>
-        public OverlaySystem? GetSystem(string key)
-        {
-            foreach (var s in _systems) if (s.Key == key) return s;
-            return null;
-        }
-
         public void OnEnter() { foreach (var s in _systems) s.OnEnter(this); }
 
         public void OnExit()
@@ -72,9 +65,12 @@ namespace DiscoAccess.Core.World.Overlays
         /// movement vector (east/north positive); <paramref name="speed"/> is metres/second.</summary>
         public void Tick(float dt, float dirX, float dirZ, float speed)
         {
+            // Holding the movement keys counts as moving even when the cursor can't advance (blocked against
+            // a wall), so the WhenMoving systems don't stutter; an audio system that should fall silent
+            // without control gates on HasControl itself rather than on this signal.
             bool intent = dirX != 0f || dirZ != 0f;
             if (_env.HasControl) Cursor.Glide(dirX, dirZ, dt, speed);
-            _motion.Update(Cursor.Position, dt, intent && _env.HasControl);
+            _motion.Update(Cursor.Position, dt, intent);
             for (int i = 0; i < _systems.Count; i++) _systems[i].Tick(dt, this);
         }
 

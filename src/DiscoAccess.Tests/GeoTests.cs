@@ -9,11 +9,12 @@ namespace DiscoAccess.Tests
         private static readonly Vector3 Origin = new Vector3(0f, 0f, 0f);
 
         [Fact]
-        public void Distance_IsPlanar_IgnoresHeight()
+        public void Distance_Is3D_CountsElevation()
         {
-            // 3-4-5 on XZ, plus a large vertical gap that must not inflate the planar distance.
-            var d = Geo.Distance(Origin, new Vector3(3f, 100f, 4f));
-            Assert.Equal(5f, d, 3);
+            // Flat: 3-4-5 on XZ with no height.
+            Assert.Equal(5f, Geo.Distance(Origin, new Vector3(3f, 0f, 4f)), 3);
+            // With height: a 1-2-2 triple is straight-line distance 3, so elevation counts.
+            Assert.Equal(3f, Geo.Distance(Origin, new Vector3(1f, 2f, 2f)), 3);
         }
 
         [Theory]
@@ -35,6 +36,15 @@ namespace DiscoAccess.Tests
         {
             Assert.Equal(-1, Geo.CompassIndex(Origin, new Vector3(0.01f, 0f, -0.02f)));
             Assert.True(Geo.IsHere(Origin, new Vector3(0.01f, 0f, -0.02f)));
+        }
+
+        [Fact]
+        public void CompassIndex_DirectlyAbove_HasNoBearing()
+        {
+            // No horizontal offset, large vertical gap: no compass bearing, and not "here" (it's above).
+            var above = new Vector3(0f, 10f, 0f);
+            Assert.Equal(-1, Geo.CompassIndex(Origin, above));
+            Assert.False(Geo.IsHere(Origin, above));
         }
 
         [Theory]

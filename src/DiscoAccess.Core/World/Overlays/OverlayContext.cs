@@ -5,8 +5,8 @@ namespace DiscoAccess.Core.World.Overlays
     /// <summary>
     /// What a system is handed when asked to announce: the cursor point, the player reference (origin for
     /// bearing/distance), the <see cref="AnnouncementContext"/> requested (so a system can skip contexts it
-    /// doesn't serve), and the owning overlay (so one system can read a sibling — one system per type makes
-    /// that lookup deterministic via <see cref="Overlay.Get{T}"/>).
+    /// doesn't serve), and the owning overlay (so one system can read a sibling via
+    /// <see cref="Overlay.Get{T}"/>, deterministic by one-per-type).
     /// </summary>
     public sealed class OverlayContext
     {
@@ -22,7 +22,5 @@ namespace DiscoAccess.Core.World.Overlays
             Reference = reference;
             Want = want;
         }
-
-        public T? System<T>() where T : OverlaySystem => Overlay.Get<T>();
     }
 }

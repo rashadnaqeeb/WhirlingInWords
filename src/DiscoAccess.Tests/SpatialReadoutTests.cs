@@ -35,10 +35,18 @@ namespace DiscoAccess.Tests
         }
 
         [Fact]
-        public void VerticalOffset_AppendsAboveBelow()
+        public void VerticalOffset_CountsInDistance_AndTagsDirection()
         {
-            Assert.Equal("east, 3 meters, above", SpatialReadout.Describe(Player, new Vector3(3f, 2f, 0f)));
-            Assert.Equal("east, 3 meters, below", SpatialReadout.Describe(Player, new Vector3(3f, -2f, 0f)));
+            // 3 east, 4 up: straight-line distance 5, tagged above (elevation counts toward distance).
+            Assert.Equal("east, 5 meters, above", SpatialReadout.Describe(Player, new Vector3(3f, 4f, 0f)));
+            Assert.Equal("east, 5 meters, below", SpatialReadout.Describe(Player, new Vector3(3f, -4f, 0f)));
+        }
+
+        [Fact]
+        public void DirectlyAbove_OmitsBearing()
+        {
+            // No horizontal offset: distance and the vertical tag, no spurious compass direction.
+            Assert.Equal("3 meters, above", SpatialReadout.Describe(Player, new Vector3(0f, 3f, 0f)));
         }
     }
 }

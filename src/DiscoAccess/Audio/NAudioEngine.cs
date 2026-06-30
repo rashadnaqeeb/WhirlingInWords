@@ -50,7 +50,20 @@ namespace DiscoAccess.Audio
         }
 
         internal void Add(ISampleProvider p) { if (EnsureStarted()) _mixer.AddMixerInput(p); }
-        internal void Remove(ISampleProvider p) { try { _mixer?.RemoveMixerInput(p); } catch { } }
+        internal void Remove(ISampleProvider p)
+        {
+            try { _mixer?.RemoveMixerInput(p); }
+            catch (Exception e) { _log?.LogWarning("[audio] mixer remove failed: " + e.Message); }
+        }
+
+        // Constant-power pan: a single source for the pan-to-(left,right) gain law, shared by the one-shot
+        // and the wall-tone voices so they place a given bearing identically.
+        internal static void PanGains(float pan, out float left, out float right)
+        {
+            float t = (pan + 1f) * 0.5f * (float)(Math.PI / 2.0); // -1 = hard left, +1 = hard right
+            left = (float)Math.Cos(t);
+            right = (float)Math.Sin(t);
+        }
 
         public void PlayOneShot(float frequency, float seconds, float volume, float pan)
         {
@@ -62,7 +75,8 @@ namespace DiscoAccess.Audio
 
         public void Dispose()
         {
-            try { _out?.Stop(); _out?.Dispose(); } catch { }
+            try { _out?.Stop(); _out?.Dispose(); }
+            catch (Exception e) { _log?.LogWarning("[audio] output dispose failed: " + e.Message); }
             _out = null;
             _mixer = null;
         }
@@ -82,9 +96,9 @@ namespace DiscoAccess.Audio
                 _total = Math.Max(1, (int)(seconds * rate));
                 _attack = Math.Min(_total / 2, (int)(0.005f * rate));
                 _release = Math.Min(_total / 2, (int)(0.02f * rate));
-                float t = (pan + 1f) * 0.5f * (float)(Math.PI / 2.0);
-                _gainL = vol * (float)Math.Cos(t);
-                _gainR = vol * (float)Math.Sin(t);
+                PanGains(pan, out float l, out float r);
+                _gainL = vol * l;
+                _gainR = vol * r;
                 WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
             }
 
@@ -145,8 +159,8 @@ namespace DiscoAccess.Audio
 
             private static Voice Make(float freq, float pan)
             {
-                float t = (pan + 1f) * 0.5f * (float)(Math.PI / 2.0);
-                return new Voice { Freq = freq, L = (float)Math.Cos(t), R = (float)Math.Sin(t) };
+                PanGains(pan, out float l, out float r);
+                return new Voice { Freq = freq, L = l, R = r };
             }
 
             public void Update(float[] volumes)

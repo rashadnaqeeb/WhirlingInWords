@@ -37,8 +37,25 @@ namespace DiscoAccess.Core.World
             float abx = b.X - a.X, abz = b.Z - a.Z;
             float len2 = abx * abx + abz * abz;
             if (len2 < 1e-6f) return a;
-            float t = Clamp01(((from.X - a.X) * abx + (from.Z - a.Z) * abz) / len2);
+            float t = WorldMath.Clamp01(((from.X - a.X) * abx + (from.Z - a.Z) * abz) / len2);
             return new Vector3(a.X + abx * t, Lerp(a.Y, b.Y, t), a.Z + abz * t);
+        }
+
+        // The closest point of `from` over a run of segments in `pts`: stride 1 walks a connected polyline
+        // (consecutive endpoints), stride 2 walks disjoint segments (endpoint pairs). 3D distance so a run up
+        // on a ledge doesn't win over one at the reference's level. Returns `fallback` if there is no segment.
+        private static Vector3 NearestOverSegments(Vector3 from, Vector3[] pts, int stride, Vector3 fallback)
+        {
+            Vector3 best = fallback;
+            float bestD = float.MaxValue;
+            for (int i = 0; i + 1 < pts.Length; i += stride)
+            {
+                Vector3 p = ClosestOnSegment(from, pts[i], pts[i + 1]);
+                float dx = from.X - p.X, dy = from.Y - p.Y, dz = from.Z - p.Z;
+                float d = dx * dx + dy * dy + dz * dz;
+                if (d < bestD) { bestD = d; best = p; }
+            }
+            return best;
         }
 
         /// <summary>Closest point on a circle of radius <paramref name="r"/> about
@@ -55,7 +72,6 @@ namespace DiscoAccess.Core.World
             return new Vector3(center.X + dx * t, center.Y, center.Z + dz * t);
         }
 
-        private static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
         private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
         private sealed class PointBounds : ScanBounds
@@ -92,19 +108,7 @@ namespace DiscoAccess.Core.World
             }
             public override Vector3 Center => _center;
             public override Vector3 NearestPoint(Vector3 from)
-            {
-                if (_pts == null) return _center;
-                Vector3 best = _center;
-                float bestD = float.MaxValue;
-                for (int i = 0; i + 1 < _pts.Length; i += 2)
-                {
-                    var p = ClosestOnSegment(from, _pts[i], _pts[i + 1]);
-                    float dx = from.X - p.X, dy = from.Y - p.Y, dz = from.Z - p.Z;
-                    float d = dx * dx + dy * dy + dz * dz; // 3D: an opening edge up on a ledge shouldn't win
-                    if (d < bestD) { bestD = d; best = p; }
-                }
-                return best;
-            }
+                => _pts == null ? _center : NearestOverSegments(from, _pts, 2, _center);
         }
 
         private sealed class PolylineBounds : ScanBounds
@@ -119,19 +123,7 @@ namespace DiscoAccess.Core.World
             }
             public override Vector3 Center => _center;
             public override Vector3 NearestPoint(Vector3 from)
-            {
-                if (_pts.Length == 1) return _pts[0];
-                Vector3 best = _pts[0];
-                float bestD = float.MaxValue;
-                for (int i = 0; i + 1 < _pts.Length; i++)
-                {
-                    var p = ClosestOnSegment(from, _pts[i], _pts[i + 1]);
-                    float dx = from.X - p.X, dy = from.Y - p.Y, dz = from.Z - p.Z;
-                    float d = dx * dx + dy * dy + dz * dz; // 3D so a vertically-distant chain doesn't win
-                    if (d < bestD) { bestD = d; best = p; }
-                }
-                return best;
-            }
+                => _pts.Length == 1 ? _pts[0] : NearestOverSegments(from, _pts, 1, _pts[0]);
         }
     }
 }

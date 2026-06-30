@@ -15,8 +15,10 @@ namespace DiscoAccess.Core.World
         {
             if (Geo.IsHere(reference, cursor)) return WorldHere;
 
-            string line = WorldCompass(Geo.CompassIndex(reference, cursor))
-                + ", " + WorldDistance((int)Math.Round(Geo.Distance(reference, cursor)));
+            int compass = Geo.CompassIndex(reference, cursor);
+            string distance = WorldDistance((int)Math.Round(Geo.Distance(reference, cursor)));
+            // Directly above/below (no horizontal bearing): just distance, then the vertical tag.
+            string line = compass >= 0 ? WorldCompass(compass) + ", " + distance : distance;
 
             int vertical = Geo.VerticalSign(reference, cursor);
             if (vertical > 0) line += ", " + WorldAbove;

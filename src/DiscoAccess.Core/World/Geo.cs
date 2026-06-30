@@ -20,25 +20,32 @@ namespace DiscoAccess.Core.World
         /// threshold), so a thing a step up doesn't get an "above".</summary>
         public const float VerticalThreshold = 1.5f;
 
-        /// <summary>Planar (XZ) distance in metres — height is reported separately via
-        /// <see cref="VerticalSign"/>, so it does not inflate the spoken distance.</summary>
+        /// <summary>Straight-line (3D) distance in metres. Elevation within an area is real (the city has
+        /// height, not only the Whirling's separate floors), so a thing up on a ledge reads as genuinely
+        /// farther rather than only being tagged "above"; the bearing stays planar and
+        /// <see cref="VerticalSign"/> still gives the vertical direction.</summary>
         public static float Distance(Vector3 from, Vector3 to)
         {
-            float dx = to.X - from.X, dz = to.Z - from.Z;
-            return (float)Math.Sqrt(dx * dx + dz * dz);
+            float dx = to.X - from.X, dy = to.Y - from.Y, dz = to.Z - from.Z;
+            return (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
         }
 
-        /// <summary>Whether the two points coincide on the XZ plane (within <see cref="HereEpsilon"/>).</summary>
+        /// <summary>Whether the two points coincide in all three axes — you're on it. Vertical separation
+        /// past the <see cref="VerticalThreshold"/> counts, so a thing directly overhead is not "here"; it
+        /// reads its height as distance plus "above".</summary>
         public static bool IsHere(Vector3 from, Vector3 to)
-            => Math.Abs(to.X - from.X) < HereEpsilon && Math.Abs(to.Z - from.Z) < HereEpsilon;
+            => Math.Abs(to.X - from.X) < HereEpsilon
+            && Math.Abs(to.Z - from.Z) < HereEpsilon
+            && Math.Abs(to.Y - from.Y) < VerticalThreshold;
 
         /// <summary>The eight-point compass bearing from one point to another as an index 0..7
-        /// (0 = north = +Z, 2 = east = +X, clockwise), or -1 when the points coincide (no bearing). The
-        /// announce layer maps the index to a localized compass word.</summary>
+        /// (0 = north = +Z, 2 = east = +X, clockwise), or -1 when there is no horizontal bearing (the points
+        /// coincide on the XZ plane, e.g. a thing directly above or below). The announce layer maps the index
+        /// to a localized compass word.</summary>
         public static int CompassIndex(Vector3 from, Vector3 to)
         {
-            if (IsHere(from, to)) return -1;
             float dx = to.X - from.X, dz = to.Z - from.Z;
+            if (Math.Abs(dx) < HereEpsilon && Math.Abs(dz) < HereEpsilon) return -1; // no horizontal bearing
             double deg = Math.Atan2(dx, dz) * (180.0 / Math.PI); // 0 = +Z (north), 90 = +X (east)
             if (deg < 0) deg += 360.0;
             return (int)Math.Round(deg / 45.0) % 8;

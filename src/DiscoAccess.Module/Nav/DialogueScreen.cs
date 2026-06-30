@@ -32,6 +32,11 @@ namespace DiscoAccess.Module.Nav
         // the landing announce, and a spoken "dialogue" would only cut into the line and break immersion.
         public override string ScreenName => string.Empty;
 
+        // Nothing to search through in a conversation, so bare letters are freed: type-ahead off, and the
+        // world status reads (t/m/h) and Left/Right quick-heals are wanted here (health can run out mid-talk).
+        public override bool TypeAheadEnabled => false;
+        public override bool WantsStatusKeys => true;
+
         private Container _root;
         private Container _flow;
         private UIElement _landing;

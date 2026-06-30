@@ -28,7 +28,7 @@ namespace DiscoAccess.Module.Input
         /// search is cleared and no keys are read.</summary>
         public void Tick(ScreenManager screens, bool editActive)
         {
-            bool own = screens.OwnsKeyboard && !editActive;
+            bool own = screens.OwnsKeyboard && !editActive && screens.TypeAheadEnabled;
             if (!own)
             {
                 if (_ownedLastFrame) screens.ClearSearch();

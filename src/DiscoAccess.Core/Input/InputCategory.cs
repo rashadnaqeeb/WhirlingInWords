@@ -22,5 +22,12 @@ namespace DiscoAccess.Core.Input
         /// control and no menu took it). Its actions fire their own handlers, the world reader's, rather
         /// than routing into the UI navigator.</summary>
         World,
+
+        /// <summary>The world status readouts (time, money, health) and the two quick-heal keys
+        /// (Left/Right) that stay useful outside free-roam. Live in free-roam (alongside <see cref="World"/>)
+        /// and in any screen that declares it wants them (the conversation view), but not in menus where
+        /// bare letters drive type-ahead. Like <see cref="World"/>, its actions fire their own handlers
+        /// rather than routing through the navigator.</summary>
+        Status,
     }
 }

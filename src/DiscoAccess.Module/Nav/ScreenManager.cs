@@ -81,6 +81,13 @@ namespace DiscoAccess.Module.Nav
         /// ViewsPagesBridge/NavigationManager reads until this is true or they throw too.</summary>
         public bool ViewReady { get; private set; }
 
+        /// <summary>Whether type-ahead search is enabled on the attached screen (default true when none).</summary>
+        public bool TypeAheadEnabled => _attachedScreen?.TypeAheadEnabled ?? true;
+
+        /// <summary>Whether the attached screen wants the Status keys (status reads, quick-heals) live
+        /// (default false when none).</summary>
+        public bool StatusKeysActive => _attachedScreen?.WantsStatusKeys ?? false;
+
         public ScreenManager(IModHost host)
         {
             _host = host;

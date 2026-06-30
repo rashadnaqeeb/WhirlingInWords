@@ -38,7 +38,11 @@ namespace DiscoAccess.Module
         // the cursor verbs the reader handles.
         private WorldCommands _commands;
         private static readonly InputCategory[] UiCategory = { InputCategory.UI };
-        private static readonly InputCategory[] WorldCategory = { InputCategory.World };
+        // Status precedes UI ON PURPOSE: in a screen that wants the status keys (dialogue) the heal arrows
+        // (Status, Left/Right) shadow the inert UI Left/Right; the rest of UI (Up/Down/Tab/Enter/Escape/
+        // Home/End/Backslash) binds no key Status binds, so it is unaffected.
+        private static readonly InputCategory[] UiWithStatus = { InputCategory.Status, InputCategory.UI };
+        private static readonly InputCategory[] WorldCategory = { InputCategory.World, InputCategory.Status };
         // The global mod-menu hotkey's action key (internal id, never spoken).
         private const string ModMenuAction = "mod.menu";
         // The single source of truth for "a game text field owns the keyboard" (grace-inclusive). While
@@ -106,19 +110,22 @@ namespace DiscoAccess.Module
             _input.Register(WorldActions.Help, Strings.InputWorldHelp, InputCategory.World, () => _commands.OpenHelp()).AddBinding(new KeyboardBinding(KeyCode.F1));
 
             // Gameplay quick-actions. Left/Right use the assigned heal item for the two bars (matching the
-            // controller dpad); 1/2 use the hand-equipped items; F5/F8 quicksave/quickload.
-            _input.Register(WorldActions.HealEndurance, Strings.InputWorldHealHealth, InputCategory.World, () => _commands.HealEndurance()).AddBinding(new KeyboardBinding(KeyCode.LeftArrow));
-            _input.Register(WorldActions.HealVolition, Strings.InputWorldHealMorale, InputCategory.World, () => _commands.HealVolition()).AddBinding(new KeyboardBinding(KeyCode.RightArrow));
+            // controller dpad); 1/2 use the hand-equipped items; F5/F8 quicksave/quickload. The heal arrows
+            // are Status, not World, so they stay live in a screen that wants them (the conversation view,
+            // where health can run out mid-talk) without dragging the rest of the world keys in.
+            _input.Register(WorldActions.HealEndurance, Strings.InputWorldHealHealth, InputCategory.Status, () => _commands.HealEndurance()).AddBinding(new KeyboardBinding(KeyCode.LeftArrow));
+            _input.Register(WorldActions.HealVolition, Strings.InputWorldHealMorale, InputCategory.Status, () => _commands.HealVolition()).AddBinding(new KeyboardBinding(KeyCode.RightArrow));
             _input.Register(WorldActions.LeftHandItem, Strings.InputWorldLeftHandItem, InputCategory.World, () => _commands.UseLeftHand()).AddBinding(new KeyboardBinding(KeyCode.Alpha1));
             _input.Register(WorldActions.RightHandItem, Strings.InputWorldRightHandItem, InputCategory.World, () => _commands.UseRightHand()).AddBinding(new KeyboardBinding(KeyCode.Alpha2));
             _input.Register(WorldActions.QuickSave, Strings.InputWorldQuickSave, InputCategory.World, () => _commands.QuickSave()).AddBinding(new KeyboardBinding(KeyCode.F5));
             _input.Register(WorldActions.QuickLoad, Strings.InputWorldQuickLoad, InputCategory.World, () => _commands.QuickLoad()).AddBinding(new KeyboardBinding(KeyCode.F8));
 
             // Status readouts: bare letters, each press re-reads (distinct by modifier from the Ctrl+letter
-            // screen keys: T thought cabinet vs T time, etc.).
-            _input.Register(WorldActions.ReadTime, Strings.InputWorldReadTime, InputCategory.World, () => _commands.ReadTime()).AddBinding(new KeyboardBinding(KeyCode.T));
-            _input.Register(WorldActions.ReadMoney, Strings.InputWorldReadMoney, InputCategory.World, () => _commands.ReadMoney()).AddBinding(new KeyboardBinding(KeyCode.M));
-            _input.Register(WorldActions.ReadHealth, Strings.InputWorldReadHealth, InputCategory.World, () => _commands.ReadHealth()).AddBinding(new KeyboardBinding(KeyCode.H));
+            // screen keys: Ctrl+T thought cabinet vs T time, etc.). Status, not World, so they stay live in a
+            // screen that wants them (the conversation view).
+            _input.Register(WorldActions.ReadTime, Strings.InputWorldReadTime, InputCategory.Status, () => _commands.ReadTime()).AddBinding(new KeyboardBinding(KeyCode.T));
+            _input.Register(WorldActions.ReadMoney, Strings.InputWorldReadMoney, InputCategory.Status, () => _commands.ReadMoney()).AddBinding(new KeyboardBinding(KeyCode.M));
+            _input.Register(WorldActions.ReadHealth, Strings.InputWorldReadHealth, InputCategory.Status, () => _commands.ReadHealth()).AddBinding(new KeyboardBinding(KeyCode.H));
 
             // Ctrl+L cycles the game language, global (the world and menus), since the game's bare-key binding
             // is killed by type-ahead in our migrated screens. Not while a text field is editing.
@@ -134,12 +141,14 @@ namespace DiscoAccess.Module
                 .AddBinding(new KeyboardBinding(KeyCode.M, ctrl: true));
 
             // The live category each frame: the UI category while our navigator owns the keyboard (a
-            // registered screen, no popup up), else the World category while the world reader owns it
-            // (free-roam with control). A menu screen is authoritative, so UI wins when both could apply (a
-            // popup over the world). Set after both managers resolve ownership in Tick, before input is polled.
+            // registered screen, no popup up), plus the Status keys when that screen wants them (the
+            // conversation view); else World plus Status while the world reader owns the keyboard (free-roam
+            // with control). A menu screen is authoritative, so UI wins when both could apply (a popup over
+            // the world). Set after both managers resolve ownership in Tick, before input is polled.
             _input.ActiveCategoriesProvider = () =>
             {
-                if (_screens.OwnsKeyboard && !_editGate.Active) return UiCategory;
+                if (_screens.OwnsKeyboard && !_editGate.Active)
+                    return _screens.StatusKeysActive ? UiWithStatus : UiCategory;
                 if (_world.OwnsKeyboard) return WorldCategory;
                 return null;
             };

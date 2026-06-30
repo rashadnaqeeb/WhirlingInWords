@@ -27,6 +27,17 @@ namespace DiscoAccess.Module.Nav
         /// <summary>Build the navigable tree from live game state. Called on each entry.</summary>
         public abstract Container BuildRoot(IModHost host);
 
+        /// <summary>Whether type-ahead search is active while this screen owns the keyboard. A screen with
+        /// nothing to search through (the conversation view) overrides this to false so bare letters are
+        /// free for other use. Default true.</summary>
+        public virtual bool TypeAheadEnabled => true;
+
+        /// <summary>Whether this screen wants the <see cref="DiscoAccess.Core.Input.InputCategory.Status"/>
+        /// keys (time/money/health reads and the Left/Right quick-heals) live while it owns the keyboard.
+        /// Default false; the conversation view overrides this to true. Off for menus, where the heal arrows
+        /// and bare letters serve navigation/type-ahead instead.</summary>
+        public virtual bool WantsStatusKeys => false;
+
         /// <summary>Called every frame while this screen stands (the view is unchanged). A rich screen
         /// overrides it to refresh dynamic content in place - rebuilding a sub-tree when the game state it
         /// mirrors changes (e.g. an options tab switch) and re-homing the navigator. Returns whether focus

@@ -18,12 +18,14 @@ screens, the pause and help menus, the status readouts (time, money, health), an
 quick-actions through the world keymap. The navigation model below is wired: being in the world owns the
 keyboard the same way a migrated menu does. **Wall tones** sound the nearest walls in the four cardinals
 around the cursor, so the player hears the room's edges as they glide. The **cursor object cue** names the
-things it passes over: a stereo click as the cursor crosses each thing's footprint while gliding, and the
-thing's spoken name (the object noun, resolved by `EntityNaming`) folded into the point readout when the
-glide stops. Underneath, a live registry classifies every entity in the area and filters it down to the
-actionable set, and an audio engine places stereo cues. What is still missing to make the world fully
-legible are the remaining leaf sensing systems (the sonar and the scanner) that turn the registry into a
-sense of what surrounds the cursor.
+things it passes over: a stereo click as the cursor crosses each thing's real footprint while gliding, and
+the thing's spoken name (resolved by `EntityNaming` from the game's own authored name) folded into the point
+readout when the glide stops. The cursor senses exactly the actionable interactable set, the same set the
+Enter verb acts on, through one shared selection, so what it names and what Enter clicks can never disagree.
+Underneath, a live registry classifies every entity in the area and filters it down to that set, and an
+audio engine places stereo cues. What is still missing to make the world fully legible are the remaining
+leaf sensing systems (the sonar and the scanner) that turn the registry into a sense of what surrounds the
+cursor.
 
 ## Architecture
 
@@ -86,11 +88,13 @@ Core overlay framework (`Core/World/Overlays/`):
   into or out of a thing's footprint (a rising click on entering one, including swapping straight from one
   thing to another; a falling click on leaving to bare ground, panned toward the thing); and on a glide
   stroke ending it contributes the name of the thing under the cursor to the point readout, so the player
-  hears "woodpile; southeast, 11 meters" (name first, then the spatial system's position). It reads the
-  full visible set (scenery included) - the cursor is the look-around sense, while the sonar and scanner
-  read only the actionable set - finding the nearest visible thing within a small hover radius of the
-  cursor (a footprint stand-in until real bounds are wired), skipping the player's own entity. It self-
-  gates like the wall tones (silent under a cutscene, lost control, or a menu over the world).
+  hears "crate; southeast, 11 meters" (name first, then the spatial system's position). The blip, the spoken
+  name, and the Enter verb all call one selection, `ObjectCueSystem.Under` (the nearest actionable
+  interactable whose real footprint the cursor is within a small margin of, skipping the player's own
+  entity), so they can never name one thing and act on another. The set is the accessible non-orb
+  interactables, the exact set Enter can act on - scenery and the not-yet-interactable orbs are neither
+  named nor clicked. It self-gates like the wall tones (silent under a cutscene, lost control, or a menu
+  over the world).
 
 Core audio contract (`Core/Audio/`):
 
@@ -101,20 +105,30 @@ Core audio contract (`Core/Audio/`):
 Core world-model contracts (`Core/World/`):
 
 - `IWorldItem` is the sensing-facing view of a thing (name, position, bounds, category, IsAccessible,
-  IsVisible, Interact), implemented by a Module proxy that reads live.
+  IsVisible, Interact), implemented by a Module proxy that reads live. `Bounds` is a real footprint: a `Box`
+  sized to the entity's combined solid-mesh renderer bounds (measured once, since size is structural, with
+  the centre read live), so the cursor is "on" a thing anywhere over its surface, not only dead-centre.
 - `IWorldModel` is the registry contract: the live collection of items plus `Added`/`Removed` events, so a
   consumer can attach to a thing (for example a sonar voice) and follow it rather than re-scanning.
 - `WorldTaxonomy` is the flat category set (npc, door, exit, container, orb, other).
-- `EntityNaming` resolves the spoken name from the raw fields a proxy extracts (engine-free, unit-tested),
-  since there is no clean display-name field. The rule speaks the object NOUN, not a bare category word:
-  a named character keeps their full name ("Kim Kitsuragi"), or reads "person" for a slug; a door/exit
-  keeps a clean name else its category word; everything else extracts the noun from the `GameObject.name`
-  (the last word of a clean "Harbor Crate 22" is "crate"; the slug clutter "box_3 rooftop" carries its
-  noun before the underscore, "box"; "empty bottle" keeps the last word "bottle"). Where a slug's leading
-  word is a location instead ("Ice_eternite"), a spoiler-filtered examine-conversation title names it
-  ("Eternite") - the title is stripped of its "<area> / " scaffolding and rejected outright if it looks
-  mechanical or conditional (a check word, a difficulty number, multiple clauses), so meta a sighted
-  player cannot see is never spoken. Validated live across Martinaise's ~370 entities.
+- `EntityNaming` resolves the spoken name from the raw fields a proxy extracts (engine-free, unit-tested).
+  It prefers the game's own authored name, which the proxy resolves per type: for a character or prop the
+  examine conversation's CONVERSANT actor, localized ("Yard Cuno" reads "Cuno", "Eternite_door" reads "Pile
+  of Eternite"); for an exit the DESTINATION it leads to plus the portal type read from the GameObject.name
+  (door / gate / stairs / elevator, else "exit"), so "Whirling in Rags door", "floor 2 stairs", "Tent exit".
+  An exit's destination is its distinct localized area name when that differs from where you are (another
+  building, or a floor the game names, "Bookstore"); when the destination shares the current name (all
+  Whirling floors are "Whirling-in-Rags") it falls to the floor/level from the scene id suffix, so an
+  inter-floor staircase reads "floor 2 stairs" (or "basement stairs" for a "-s<n>" sublevel). A door onto the
+  main exterior whose own name is a specific spot reads that spot, defaulting to "door" ("balcony door"), so
+  it is not hidden behind the coarse "Martinaise". Hyphens in an authored name are spoken as spaces
+  ("Whirling-in-Rags" to "Whirling in Rags"), and a "Name, the Title" actor name keeps just the name before
+  the comma ("Garte, the Cafeteria Manager" to "Garte"). Failing an authored name it falls back to
+  the object noun from the `GameObject.name` (the last word of "Harbor Crate 22" is "crate"; "box_3 rooftop"
+  carries its noun before the underscore, "box"), and last to a spoiler-filtered examine title for the
+  location-slug form ("Ice_eternite" to "Eternite"). Unidentified NPCs are safe because DE's actor name IS
+  the display name (unknown characters are literally named "Working Class Woman"), read live so it reflects
+  the game's current reveal state. Validated live across Martinaise.
 
 Host audio (`DiscoAccess/Audio/`):
 
@@ -346,21 +360,25 @@ its `OrbUI` still inactive. In normal play the two coincide because the camera f
 which is why camera-follow (Deferred) is required for orb interaction, not only for streaming. On bare
 ground with no target, Enter is just `SetDestination`.
 
-### Reachability is the game's own oracle, not ours
+### Reachability: attempt the game's own interaction, don't pre-judge it
 
-Before committing the walk, Enter checks reachability with the game's
-`CheckIfCanCreatePathToHavePath(currentLocation)`. Do not roll our own `NavMesh.CalculatePath` to the
-entity's body: an NPC's feet can sit on an off-mesh sliver, which produces false negatives (this falsely
-reported the talkable Cunoesse as unreachable during testing). The game oracle tests the interaction
-stand-point, which is what actually determines whether you can act, and it matches what is interactable
-in real play. If it returns false, Enter announces the target cannot be reached from here rather than
-walking partway and failing silently.
+Enter does not pre-reject on the reachability oracle `CheckIfCanCreatePathToHavePath`. That oracle tests
+whether the character can path to the interaction stand-point, but it reports false for interactables the
+game can still act on by walking the final leg itself: Garte the bartender carries a real conversation,
+yet his stand-point sits behind the bar on a navmesh pocket the player cannot path to, so the oracle says
+unreachable while the game's own `Interact()` walks the character around and starts the dialogue (proven
+live). So gating Enter on the oracle wrongly refused Garte. Instead, Enter walks toward the target and
+calls the game's `Interact()` on arrival, and again if the walk stalls near it (an NPC behind a counter);
+only when `Interact()` itself refuses is the thing genuinely unreachable, and then Enter says so. Do not
+roll our own `NavMesh.CalculatePath` to the entity's body either: an NPC's feet can sit on an off-mesh
+sliver, a false negative (this falsely reported the talkable Cunoesse unreachable during testing).
 
-`IsAccessible` is not a reachability guarantee. The Yard Woodpile reads `IsAccessible = true` yet is
-walled off from the backyard navmesh; its stand-point is on a separate navmesh component
-(`CheckIfCanCreatePathToHavePath` false, confirmed by the game's own check and three independent navmesh
-measurements). So reachability is always a live per-position check, never cached and never inferred from
-`IsAccessible`; a thing unreachable from here can become reachable once the character has moved.
+The oracle stays on the proxy as `IsActionable(from)` for the future sonar and scanner (a cheap
+per-position "could I act on this" signal), but it is no longer the Enter gate. `IsAccessible` is not a
+reachability guarantee either: the Yard Woodpile reads `IsAccessible = true` yet is walled off from the
+backyard navmesh, so its walk stalls and `Interact()` refuses, and Enter reports "can't reach" after the
+attempt rather than pre-judging. A thing unreachable from here can become reachable once the character
+has moved.
 
 ### Talk-across-barrier, and position versus actionability
 
@@ -414,8 +432,9 @@ The `Dev*` hooks remain only as introspection. The proxies (`EntityProxy`, `OrbP
 `InteractionPoint(from)` and `IsActionable(from)`, both approach-relative and reading live through
 `GetInteractionLocation` and `CheckIfCanCreatePathToHavePath` (an orb has no stand-point, so it reports
 its body and is not actionable). The Enter verb is `WalkInteract`, a small arrival-watching state machine
-(target the stand-point, drive `SetDestination` with `AUTOMATIC`, watch `movementStatus`, `Interact` on
-arrival), cancellable by Space. The game-acting hotkeys (screens, pause/help, status reads,
+(target the stand-point, drive `SetDestination` with `AUTOMATIC`, watch `movementStatus`, call the game's
+`Interact` on arrival - and again if the walk stalls near the target, letting the game walk the final leg
+into a spot our path could not reach), cancellable by Space. The game-acting hotkeys (screens, pause/help, status reads,
 quick-actions) live in `WorldCommands`, each calling the game's own method directly since the wholesale
 mute leaves no key for the game to read.
 
@@ -471,13 +490,17 @@ These are real forks left open on purpose, not oversights.
 - The remaining settings-menu wiring for the world systems (the sonar's on/off and "what does the sonar
   sonify" category toggles). The wall tones' volume and continuous/when-moving toggle are wired.
 - Sampled audio assets, if the procedural cues prove insufficient.
-- Bounds refinement: doorway segments and footprint circles. Every proxy currently reports a point
-  bound; the richer shapes exist in `ScanBounds` but are not yet wired to the proxies. Until they are, the
-  cursor's object cue uses a fixed hover radius as a footprint stand-in.
+- Bounds refinement: doorway segments. Proxies now report a real `Box` footprint from renderer bounds
+  (`ScanBounds.Box`), so the point-bound stand-in is gone; the disjoint-segment shape for a doorway's portal
+  edges still exists in `ScanBounds` unused, if a door ever wants its opening measured rather than its box.
+- Area / district announcement. The district is encoded in entity names ("Harbor Crate", "Plaza Money") and
+  clusters spatially; a future overlay could name the cursor's district from the dominant capitalized name
+  prefix of the entities around it. Deferred (the raw prefix needs filtering against object-noun/adjective
+  leads; validated that the clusters are real).
 - Orb interaction. Camera follow (now built, see above) keeps an orb under the cursor rendered, which is
   the gate its clickable needs, so this is unblocked: the remaining work is making `OrbProxy.IsActionable`
   and `Interact` real (likely through `SenseOrb.StartConversation`, in range) and letting the Enter verb
-  target orbs, which `WorldReader.NearestActionableTo` currently skips.
+  target orbs, which the cursor's shared `Under` selection currently skips (orbs are excluded by category).
 - Recentering the cursor onto the player when an area is entered.
 
 ## Validation snapshot

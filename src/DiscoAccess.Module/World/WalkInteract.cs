@@ -122,12 +122,18 @@ namespace DiscoAccess.Module.World
             }
         }
 
-        // End a stalled walk. A target approach that failed mid-path speaks "can't reach" so the player is not
-        // left in silence; a bare-ground walk that stalled just stops being watched.
+        // End a stalled walk. Our SetDestination could not reach the stand-point, but the game's own Interact
+        // may still walk the character the final leg and act - an NPC behind a bar counter, whose stand-point
+        // sits on a navmesh pocket we cannot path to, is reached and talked to this way (proven live with
+        // Garte). So try Interact first; only when it too refuses is the thing genuinely unreachable (the
+        // walled-off Yard Woodpile), and then we say so rather than leave the player in silence. A bare-ground
+        // walk (no target) just stops being watched.
         private void Stall()
         {
-            if (_target != null) _host.Speech.Speak(Strings.WorldUnreachable(_target.Name), interrupt: true);
             _active = false;
+            if (_target == null) return;
+            if (_target.Interact()) return;
+            _host.Speech.Speak(Strings.WorldUnreachable(_target.Name), interrupt: true);
         }
 
         // Arrived when the game reports the move completed, or the character already stands within the

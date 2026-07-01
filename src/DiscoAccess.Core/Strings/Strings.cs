@@ -333,7 +333,14 @@ namespace DiscoAccess.Core.Strings
         // title to fall back to (see EntityNaming). A door reads "door", a crate "container", and so on, so
         // nothing the cursor passes over goes nameless. Authored (the game has no short type label).
         public const string WorldThingDoor = "door";
+        public const string WorldThingGate = "gate";
+        public const string WorldThingStairs = "stairs";
+        public const string WorldThingElevator = "elevator";
         public const string WorldThingExit = "exit";
+        // Level words for an exit whose destination floor shares its building's name (see
+        // EntityNaming.ExitDestinationLabel): "floor 2 stairs", "basement stairs".
+        public const string WorldFloor = "floor";
+        public const string WorldBasement = "basement";
         public const string WorldThingContainer = "container";
         public const string WorldThingPerson = "person";
         public const string WorldThingOrb = "orb";

@@ -35,6 +35,35 @@ namespace DiscoAccess.Tests
         }
 
         [Fact]
+        public void Box_NearestClampsToTheRectangleEdge()
+        {
+            // A 2x2 box (half-widths 1) at the origin; from (5,0,0.5) the nearest point is on the +X face at
+            // the reference's own Z, (1,0,0.5) - so a wide crate's near edge is measured, not its centre.
+            var b = ScanBounds.Box(new Vector3(0f, 0f, 0f), 1f, 1f);
+            var np = b.NearestPoint(new Vector3(5f, 0f, 0.5f));
+            Assert.Equal(1f, np.X, 3);
+            Assert.Equal(0.5f, np.Z, 3);
+        }
+
+        [Fact]
+        public void Box_InsideFootprint_ReturnsTheReference()
+        {
+            var b = ScanBounds.Box(new Vector3(0f, 0f, 0f), 3f, 2f);
+            var from = new Vector3(1f, 0f, -1f);
+            Assert.Equal(from.X, b.NearestPoint(from).X, 3);
+            Assert.Equal(from.Z, b.NearestPoint(from).Z, 3);
+        }
+
+        [Fact]
+        public void Box_CarriesCentreHeight_SoAboveBelowStillReads()
+        {
+            // A box up on a ledge (centre Y = 4): the nearest point carries that height, so a cursor on the
+            // floor reads the 3D gap and the thing correctly falls out of a small hover margin.
+            var b = ScanBounds.Box(new Vector3(0f, 4f, 0f), 1f, 1f);
+            Assert.Equal(4f, b.NearestPoint(new Vector3(5f, 0f, 0f)).Y, 3);
+        }
+
+        [Fact]
         public void Segments_NearestLiesOnTheClosestEdge()
         {
             // A doorway as one portal edge from (-1,0,0) to (1,0,0); standing due south at (0,0,-5)

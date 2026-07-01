@@ -28,12 +28,6 @@ namespace DiscoAccess.Module.World
     {
         /// <summary>The cursor glide rate, metres per second.</summary>
         private const float GlideSpeed = 4f;
-        // How near the cursor must be to an actionable thing's body for Enter to target it rather than walk
-        // to bare ground. Tied to the cursor's name-on-stop reach so the two can never drift apart: everything
-        // Enter can snap to was named when the glide stopped, never a surprise interaction on unannounced
-        // ground. The reach is generous for the same reason - the freeform cursor is navmesh-clamped and a
-        // body can sit off the mesh (a door in a wall, a prop on a ledge), so the cursor only gets near it.
-        private const float SnapRadius = ObjectCueSystem.ReachRadius;
 
         /// <summary>The live reader, for dev-server introspection/driving.</summary>
         public static WorldReader Active;
@@ -159,35 +153,20 @@ namespace DiscoAccess.Module.World
             if (!_engaged) return;
             Snv cursor = _overlay.Cursor.Position;
             Snv player = _overlay.Cursor.PlayerPosition;
-            EntityProxy target = NearestActionableTo(cursor);
-            // One reachability-oracle call, on the single chosen target. Reachable: walk to its stand-point
-            // and interact. Unreachable: the cursor sits on walkable ground regardless, so walk there (getting
-            // closer can make the thing reachable for a follow-up Enter) and name it so the player learns it
-            // is there, rather than leaving a dead zone where Enter does nothing. No target near the cursor:
-            // a plain walk to the spot.
-            if (target != null && target.IsActionable(player))
+            // The one thing under the cursor - the exact selection the cursor blip and spoken name use, so
+            // Enter acts on precisely what was announced, never a different thing. Under() returns only
+            // accessible non-orb items, all of which are entities, so the cast always takes when non-null.
+            EntityProxy target = _objects.Under(cursor, player) as EntityProxy;
+            // A thing under the cursor: walk to it and interact. We do NOT pre-reject on the reachability
+            // oracle - it reports unreachable for interactables the game can still act on by walking the last
+            // leg itself (an NPC behind a bar counter, whose stand-point sits on a navmesh pocket the player
+            // cannot path to directly). The walk verb attempts the game's own Interact on arrival, and again
+            // if it stalls near the target, reporting "can't reach" only when that too refuses (a genuinely
+            // walled-off thing like the Yard Woodpile). No target under the cursor: a plain walk to the spot.
+            if (target != null)
                 _walk.BeginInteract(target, player);
-            else if (target != null)
-                _walk.BeginWalk(cursor, Strings.WorldUnreachable(target.Name));
             else
                 _walk.BeginWalk(cursor, Strings.WorldWalking);
-        }
-
-        // The nearest actionable entity whose body sits within the snap radius of the cursor, or null for a
-        // bare-ground cursor. Selection measures to the body (cheap) and filters on the IsAccessible gate;
-        // the reachability oracle and stand-point are only consulted for the one chosen target (in
-        // WalkInteract), never the whole set. Orbs are skipped - orb interaction is deferred (camera-follow).
-        private EntityProxy NearestActionableTo(Snv cursor)
-        {
-            EntityProxy best = null;
-            float bestDist = SnapRadius;
-            foreach (var item in _model.Items)
-            {
-                if (!item.IsAccessible || !(item is EntityProxy ep)) continue;
-                float d = Snv.Distance(item.Position, cursor);
-                if (d <= bestDist) { bestDist = d; best = ep; }
-            }
-            return best;
         }
 
         // The plain in-game world is the CLEAR view. Confirmed live: during free-roam ViewsPagesBridge.Current

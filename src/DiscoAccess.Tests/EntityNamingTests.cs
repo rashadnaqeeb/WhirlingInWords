@@ -5,8 +5,126 @@ namespace DiscoAccess.Tests
 {
     public class EntityNamingTests
     {
-        private static string Resolve(string? name, string? title = null, bool named = false, string cat = WorldTaxonomy.Container)
-            => EntityNaming.Resolve(name, title, named, cat);
+        private static string Resolve(string? name, string? authored = null, string? title = null, bool named = false, string cat = WorldTaxonomy.Container)
+            => EntityNaming.Resolve(name, authored, title, named, cat);
+
+        [Fact]
+        public void AuthoredConversant_IsPreferredForProps()
+        {
+            // The game's own examine name beats the noun extractor: "Pile of Eternite", not "eternite".
+            Assert.Equal("Pile of Eternite",
+                Resolve("Eternite_door", authored: "Pile of Eternite", title: "YARD / PILE OF ETERNITE", cat: WorldTaxonomy.Other));
+            Assert.Equal("Drainage Pipe", Resolve("Drainage Pipe", authored: "Drainage Pipe", cat: WorldTaxonomy.Other));
+        }
+
+        [Fact]
+        public void NamedCharacter_TitleActorName_KeepsNameBeforeComma()
+        {
+            // "Name, the Title" actor names read just the name: "Garte", not the discarded lowercase fallback.
+            Assert.Equal("Garte", Resolve("garte", authored: "Garte, the Cafeteria Manager", named: true, cat: WorldTaxonomy.Npc));
+            Assert.Equal("Lilienne", Resolve("npc_lilienne", authored: "Lilienne, the Net Picker", named: true, cat: WorldTaxonomy.Npc));
+        }
+
+        [Fact]
+        public void NamedCharacter_PrefersAuthoredName_DroppingLocationPrefix()
+        {
+            // "Yard Cuno" is the GameObject name; the authored actor name "Cuno" is what the game shows.
+            Assert.Equal("Cuno", Resolve("Yard Cuno", authored: "Cuno", named: true, cat: WorldTaxonomy.Npc));
+            // Even a slug GameObject name yields the real name when the game authored one.
+            Assert.Equal("Cuno", Resolve("npc_cunoesse", authored: "Cuno", named: true, cat: WorldTaxonomy.Npc));
+        }
+
+        [Fact]
+        public void Exit_NamedByDestination_WithPortalType_HyphensBecomeSpaces()
+        {
+            // An exit reads the place it leads to (localized, hyphens spoken as spaces) plus the portal type
+            // read from the GameObject.name: "Whirling-in-Rags" through a "...-door-..." reads "Whirling in
+            // Rags door".
+            Assert.Equal("Whirling in Rags door",
+                Resolve("waterfront-door-rooftop", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
+            Assert.Equal("Cuno's shack door",
+                Resolve("courtyard-door-cunos-shack", authored: "Cuno's shack", cat: WorldTaxonomy.Exit));
+            // No portal word in the name falls back to the generic "exit": the tent flap's name is just "tent".
+            Assert.Equal("Tent exit", Resolve("tent", authored: "Tent", cat: WorldTaxonomy.Exit));
+            // A harbour gate reads "gate"; an inter-floor staircase reads "stairs".
+            Assert.Equal("Docks gate", Resolve("harbor-gate-1", authored: "Docks", cat: WorldTaxonomy.Exit));
+            Assert.Equal("Whirling in Rags stairs",
+                Resolve("whirling-stairs-f2", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void ExitDestination_FloorWhenNamesCollide_ElseTheDistinctName()
+        {
+            // All Whirling floors share "Whirling-in-Rags", so the shared name says nothing: use the floor.
+            Assert.Equal("floor 2",
+                EntityNaming.ExitDestinationLabel("Whirling-int-f2", "Whirling-in-Rags", "Whirling-in-Rags"));
+            Assert.Equal("floor 3",
+                EntityNaming.ExitDestinationLabel("Whirling-int-f3-antechamber", "Whirling-in-Rags", "Whirling-in-Rags"));
+            // The Doomed basement (-s1) shares its name with the floor above, so it reads "basement".
+            Assert.Equal("basement",
+                EntityNaming.ExitDestinationLabel("Doomed-commerce-int-s1", "Doomed Commercial Area", "Doomed Commercial Area"));
+            // A floor the game names distinctly is preferred over a floor number: "Bookstore", not "floor 1".
+            Assert.Equal("Bookstore",
+                EntityNaming.ExitDestinationLabel("Doomed-commerce-int-f1", "Bookstore", "Doomed Commercial Area"));
+            // A different building is distinct, so its own name is used (hyphens spaced later, in Resolve).
+            Assert.Equal("Whirling-in-Rags",
+                EntityNaming.ExitDestinationLabel("Whirling-int-f1", "Whirling-in-Rags", "Martinaise"));
+        }
+
+        [Fact]
+        public void InterFloorExit_ComposesWithType()
+        {
+            // The proxy passes the floor label as the authored name; the exit branch appends the portal type.
+            Assert.Equal("floor 2 stairs",
+                Resolve("Whirling 1st stairs", authored: "floor 2", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void SpotDoor_NamedForTheSpot_DefaultsToDoor()
+        {
+            // An exterior door named for a specific spot (the proxy passes no destination so the coarse
+            // "Martinaise" does not hide the spot): the spot leads, defaulting to "door".
+            Assert.Equal("balcony door", Resolve("Balcony", cat: WorldTaxonomy.Exit));
+            Assert.Equal("roof door", Resolve("Roof", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void Exit_Elevator_ReadsElevator()
+        {
+            Assert.Equal("floor 3 elevator",
+                Resolve("whirl1-elevator-whirl3", authored: "floor 3", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void Exit_NoDestination_FallsBackToTypeWord()
+        {
+            Assert.Equal("door", Resolve("some-door-slug", cat: WorldTaxonomy.Exit)); // slug with a portal word
+            Assert.Equal("exit", Resolve("trigger_zone", cat: WorldTaxonomy.Exit));  // slug, no portal word
+        }
+
+        [Fact]
+        public void SpotFromDoorName_OnlyCleanNonTypePlaces()
+        {
+            Assert.Equal("balcony", EntityNaming.SpotFromDoorName("Balcony"));
+            Assert.Null(EntityNaming.SpotFromDoorName("exit-courtyard"));   // a slug id
+            Assert.Null(EntityNaming.SpotFromDoorName("Whirling Door"));    // contains a portal type
+            Assert.Null(EntityNaming.SpotFromDoorName("Stairs"));           // is a portal type
+        }
+
+        [Fact]
+        public void Door_IgnoresAuthored()
+        {
+            Assert.Equal("Whirling Door", Resolve("Whirling Door", authored: "Someone", cat: WorldTaxonomy.Door));
+        }
+
+        [Fact]
+        public void UnusableAuthored_IsRejected_FallingBackToTheNoun()
+        {
+            Assert.Equal("crate", Resolve("Harbor Crate 22", authored: "You"));        // the player
+            Assert.Equal("box", Resolve("box_3 rooftop", authored: "actor_5"));         // a machine id
+            Assert.Equal("crate", Resolve("Harbor Crate 22", authored: "   "));         // blank
+            Assert.Equal("stone", Resolve("stone_x", authored: "STONE PERC", cat: WorldTaxonomy.Other)); // meta token
+        }
 
         [Fact]
         public void Container_SpeaksTheObjectNoun_NotTheLocation()
@@ -100,12 +218,6 @@ namespace DiscoAccess.Tests
         {
             Assert.Equal("door", Resolve("courtyard-door-crypto-garys-apt", cat: WorldTaxonomy.Door));
             Assert.Equal("Whirling Door", Resolve("Whirling Door", cat: WorldTaxonomy.Door));
-        }
-
-        [Fact]
-        public void Exit_KeepsCleanName()
-        {
-            Assert.Equal("tent", Resolve("tent", cat: WorldTaxonomy.Exit));
         }
     }
 }

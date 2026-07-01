@@ -16,24 +16,20 @@ namespace DiscoAccess.Core.World.Overlays.Systems
     ///   the cursor, so the player hears "crate; northeast, 2 meters" - the name first, then the position
     ///   from the spatial system.
     ///
-    /// It reads the full visible set (scenery included): the cursor is the look-around sense, while the sonar
-    /// and scanner read only the actionable set. Self-gates like the audio systems - the blip falls silent
+    /// It senses only the actionable set (accessible interactables), the exact set the Enter verb acts on, so
+    /// what the cursor names and clicks can never disagree: scenery you cannot act on and orbs (whose
+    /// interaction is deferred) are not sensed. Self-gates like the audio systems - the blip falls silent
     /// under a cutscene, a lost-control moment, or a menu floating over the world.
     /// </summary>
     public sealed class ObjectCueSystem : OverlaySystem
     {
-        // How near the cursor must be to a thing's nearest part for the glide blip to count it "on" it. A
-        // tight footprint radius, since the proxies report point bounds for now; once real footprints are
-        // wired, Bounds.NearestPoint returns distance 0 inside the shape, so the same test still holds.
-        private const float HoverRadius = 1.5f;
-        // The wider radius the name-on-stop uses to pick the thing under the cursor. It matches the Enter
-        // verb's snap radius (WorldReader.SnapRadius is defined as this), so a glide that stops leaves nothing
-        // Enter could act on unnamed: the 1.5-2.5 m band where Enter snaps but the tight blip never fired is
-        // still spoken. Kept a touch generous because the freeform cursor is navmesh-clamped and a body can
-        // sit just off the mesh.
-        public const float ReachRadius = 2.5f;
-        // Ignore things more than this far above/below the cursor (another level of the scene).
-        private const float LevelGap = 3f;
+        // The slack around a thing's real footprint within which the cursor counts as "on" it. Small, because
+        // the footprint (Bounds) now carries the thing's actual size, so this is only navmesh-clamp gap: the
+        // freeform cursor is clamped to walkable ground and a body's footprint edge can sit just off the mesh
+        // (a door in a wall, a prop against it), so the cursor only ever gets near the edge, never onto it.
+        // Bounds.NearestPoint returns distance 0 inside the shape, so a cursor over any part of a wide thing
+        // is on it. One margin for the blip, the spoken name, and Enter, since all three call Under().
+        public const float HoverMargin = 0.75f;
         // A thing this close to the player IS the player (the player's own entity, if it is in the registry);
         // never hover-announce the character you are standing on when the cursor is centred.
         private const float PlayerEpsilon = 0.5f;
@@ -102,7 +98,7 @@ namespace DiscoAccess.Core.World.Overlays.Systems
 
             Vector3 cursor = overlay.Cursor.Position;
             Vector3 player = overlay.Cursor.PlayerPosition;
-            IWorldItem? candidate = FindUnder(cursor, player, HoverRadius);
+            IWorldItem? candidate = Under(cursor, player);
 
             // A footprint crossing only happens while gliding: count this frame as a move when the cursor
             // travelled a glide-sized step. A still cursor (jitter below MoveEpsilon) or a jump (a recenter,
@@ -136,28 +132,30 @@ namespace DiscoAccess.Core.World.Overlays.Systems
         public override IEnumerable<OverlayAnnouncement> Announce(OverlayContext ctx)
         {
             if (!Enabled || ctx.Want != AnnouncementContext.Point) yield break;
-            // Name to the wider Enter reach, not the tight blip footprint, so a stop never stays silent over a
-            // thing Enter would act on.
-            IWorldItem? under = FindUnder(ctx.Cursor, ctx.Reference, ReachRadius);
+            // The name is the same Under() the blip and Enter use, so a stop names exactly the thing Enter
+            // would act on. Recomputed here (not read off the blip's confirmed state) so it is fresh after a
+            // recenter, where the cursor jumps without a glide Tick.
+            IWorldItem? under = Under(ctx.Cursor, ctx.Reference);
             if (under != null && !string.IsNullOrEmpty(under.Name))
                 yield return new OverlayAnnouncement(AnnouncementContext.Point, under.Name);
         }
 
-        // The nearest visible thing within <paramref name="radius"/> of the cursor, on the cursor's level,
-        // that is not the player's own entity. Scans the full registry each call (a few hundred items), like
-        // WOTR. The blip passes the tight HoverRadius; the name-on-stop passes the wider ReachRadius.
-        private IWorldItem? FindUnder(Vector3 cursor, Vector3 player, float radius)
+        // The one thing under the cursor: the nearest actionable interactable whose footprint the cursor is
+        // within HoverMargin of, not the player's own entity. The single selection the blip (Tick), the
+        // spoken name (Announce), and the Enter verb (WorldReader) all call, so they cannot disagree. The
+        // set is IsAccessible and non-orb - the exact set Enter can act on - so scenery and the not-yet-
+        // interactable orbs are never named or clicked. Scans the registry each call (a few hundred items).
+        public IWorldItem? Under(Vector3 cursor, Vector3 player)
         {
             IWorldItem? best = null;
-            float bestDist = radius;
+            float bestDist = HoverMargin;
             foreach (IWorldItem it in _model.Items)
             {
-                if (!it.IsVisible) continue;
-                Vector3 body = it.Position;
-                if (System.Math.Abs(body.Y - cursor.Y) > LevelGap) continue;     // another level
-                if (Geo.Distance(body, player) < PlayerEpsilon) continue;        // the player itself
-                // Strict less-than so an exact tie keeps the first-seen item rather than flapping between
-                // two coincident things as the registry's enumeration order shifts on its poll.
+                if (!it.IsAccessible || it.Category == WorldTaxonomy.Orb) continue;
+                if (Geo.Distance(it.Position, player) < PlayerEpsilon) continue; // the player itself
+                // Distance to the footprint's nearest part, 3D so a thing up on a ledge reads its height gap
+                // and falls out of the margin on its own (no arbitrary level cutoff). Strict less-than so an
+                // exact tie keeps the first-seen item rather than flapping as the poll reorders the registry.
                 float d = Geo.Distance(it.Bounds.NearestPoint(cursor), cursor);
                 if (d < bestDist) { bestDist = d; best = it; }
             }

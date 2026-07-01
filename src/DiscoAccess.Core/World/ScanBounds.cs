@@ -24,6 +24,10 @@ namespace DiscoAccess.Core.World
 
         public static ScanBounds Point(Vector3 p) => new PointBounds(p);
         public static ScanBounds Circle(Vector3 c, float radius) => new CircleBounds(c, radius);
+        /// <summary>An axis-aligned rectangle on the XZ plane about <paramref name="center"/>, with the given
+        /// half-widths - the natural footprint from a collider/renderer world AABB. A wide crate reads as its
+        /// whole surface, a thin door as its length, so the cursor is "on" the thing when over any part of it.</summary>
+        public static ScanBounds Box(Vector3 center, float halfX, float halfZ) => new BoxBounds(center, halfX, halfZ);
         /// <summary>Disjoint segments as flat endpoint pairs [a0,b0,a1,b1,...] — e.g. a doorway's portal
         /// edges (the full opening extent). <paramref name="center"/> is the cursor target.</summary>
         public static ScanBounds Segments(Vector3 center, IList<Vector3> edgePairs) => new SegmentsBounds(center, edgePairs);
@@ -80,6 +84,23 @@ namespace DiscoAccess.Core.World
             public PointBounds(Vector3 p) { _p = p; }
             public override Vector3 Center => _p;
             public override Vector3 NearestPoint(Vector3 from) => _p;
+        }
+
+        // An axis-aligned XZ rectangle: the nearest point clamps the reference into the rectangle (inside
+        // returns the reference itself, distance 0), Y carried from the centre so a thing on another level
+        // still reads its height gap. A Unity collider/renderer world AABB maps straight onto this.
+        private sealed class BoxBounds : ScanBounds
+        {
+            private readonly Vector3 _c;
+            private readonly float _hx, _hz;
+            public BoxBounds(Vector3 c, float hx, float hz) { _c = c; _hx = Math.Max(0f, hx); _hz = Math.Max(0f, hz); }
+            public override Vector3 Center => _c;
+            public override Vector3 NearestPoint(Vector3 from)
+            {
+                float x = WorldMath.Clamp(from.X, _c.X - _hx, _c.X + _hx);
+                float z = WorldMath.Clamp(from.Z, _c.Z - _hz, _c.Z + _hz);
+                return new Vector3(x, _c.Y, z);
+            }
         }
 
         private sealed class CircleBounds : ScanBounds

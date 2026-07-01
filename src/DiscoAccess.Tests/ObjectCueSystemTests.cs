@@ -47,9 +47,16 @@ namespace DiscoAccess.Tests
             public string Name { get; set; } = "thing";
             public Vector3 Position { get; set; }
             public bool Visible { get; set; } = true;
-            public ScanBounds Bounds => ScanBounds.Point(Position);
-            public string Category => WorldTaxonomy.Other;
-            public bool IsAccessible => true;
+            public bool Accessible { get; set; } = true;
+            public string Cat { get; set; } = WorldTaxonomy.Other;
+            // A footprint half-extent: 0 is a point (the default), >0 is a square Box the size of the thing,
+            // so a test can put a wide object under the cursor from its edge.
+            public float HalfExtent { get; set; }
+            public ScanBounds Bounds => HalfExtent > 0f
+                ? ScanBounds.Box(Position, HalfExtent, HalfExtent)
+                : ScanBounds.Point(Position);
+            public string Category => Cat;
+            public bool IsAccessible => Accessible;
             public bool IsVisible => Visible;
             public Vector3 InteractionPoint(Vector3 from) => Position;
             public bool IsActionable(Vector3 from) => false;
@@ -128,12 +135,12 @@ namespace DiscoAccess.Tests
         public void GlidingThingToThing_RisingClick_NoExit()
         {
             var (overlay, audio, model, _, _) = Build();
-            model.List.Add(new FakeItem { Position = new Vector3(2f, 0f, 0f) });
-            model.List.Add(new FakeItem { Position = new Vector3(4f, 0f, 0f) }); // footprints overlap, no gap
+            model.List.Add(new FakeItem { Position = new Vector3(2f, 0f, 0f), HalfExtent = 1f }); // covers x 1..3
+            model.List.Add(new FakeItem { Position = new Vector3(4f, 0f, 0f), HalfExtent = 1f }); // covers x 3..5, abuts A at 3
 
             Glide(overlay, 0f); // baseline bare
             Glide(overlay, 2f); // enter A
-            Glide(overlay, 4f); // straight onto B
+            Glide(overlay, 4f); // straight onto B across their shared edge - no bare ground between
             Assert.Equal(new[] { AudioCue.CursorEnter, AudioCue.CursorEnter }, audio.Cues);
         }
 
@@ -148,7 +155,7 @@ namespace DiscoAccess.Tests
             Glide(overlay, 0f); // baseline on A
             // Flicker: A streams out, B streams in at the same spot - the nearest thing changes, but the
             // cursor has not moved, so no footprint was crossed.
-            a.Visible = false;
+            a.Accessible = false;
             model.List.Add(new FakeItem { Position = Vector3.Zero });
             overlay.Cursor.Position = Vector3.Zero;
             overlay.Tick(0.05f, 0f, 0f, 4f);
@@ -162,29 +169,48 @@ namespace DiscoAccess.Tests
             // A moving cursor plus a thing that streams in for a single frame and back out (a SenseOrb the
             // camera-follow pulls in near the cursor's path) must not blip: it was never crossed, only flashed.
             var (overlay, audio, model, _, _) = Build();
-            var ghost = new FakeItem { Position = new Vector3(5f, 0f, 0f), Visible = false };
+            var ghost = new FakeItem { Position = new Vector3(5f, 0f, 0f), Accessible = false };
             model.List.Add(ghost);
 
-            Glide(overlay, 3f);                              // baseline + glide over bare ground (ghost hidden)
-            overlay.Cursor.Position = new Vector3(4f, 0f, 0f);
-            ghost.Visible = true;
-            overlay.Tick(0.05f, 0f, 0f, 4f);                // ghost streams in under the moving cursor
-            overlay.Cursor.Position = new Vector3(4.2f, 0f, 0f);
-            ghost.Visible = false;
+            Glide(overlay, 4.6f);                            // baseline + glide over bare ground (ghost out of set)
+            overlay.Cursor.Position = new Vector3(5f, 0f, 0f);
+            ghost.Accessible = true;
+            overlay.Tick(0.05f, 0f, 0f, 4f);                // ghost streams in under the moving cursor (0.4 m step)
+            overlay.Cursor.Position = new Vector3(5.2f, 0f, 0f);
+            ghost.Accessible = false;
             overlay.Tick(0.05f, 0f, 0f, 4f);                // and straight back out, never confirmed
             Assert.Empty(audio.Cues);
         }
 
         [Fact]
-        public void Announce_NamesAThingWithinReach_BeyondTheBlipFootprint()
+        public void Announce_UsesTheSameSelectionAsTheBlip()
         {
-            // The name-on-stop reaches farther (2.5 m) than the blip footprint (1.5 m), matching the Enter
-            // snap radius, so a stop never leaves a thing Enter could act on unspoken.
+            // The name-on-stop and the blip share one Under() selection, so a point-thing 2 m off (well past
+            // the hover margin) is not named - exactly as it would not have blipped and Enter would not act.
             var backend = new FakeBackend();
             var (overlay, _, model, _, _) = Build(backend);
             model.List.Add(new FakeItem { Name = "crate", Position = new Vector3(2f, 0f, 0f) });
 
-            overlay.Cursor.Position = Vector3.Zero; // 2 m off: past the blip radius, inside the reach radius
+            overlay.Cursor.Position = Vector3.Zero; // 2 m off a point footprint: outside the margin
+            overlay.AnnounceCurrent();
+            Assert.Empty(backend.Spoken);
+        }
+
+        [Fact]
+        public void WideFootprint_HoveredFromItsEdge()
+        {
+            // A thing with a real footprint (a 2 m half-extent box) is "on" the cursor anywhere over its
+            // surface, even 2 m from its centre - what a point bound could never do, and the fix for a wide
+            // crate reading as bare ground everywhere but dead-centre.
+            var backend = new FakeBackend();
+            var (overlay, audio, model, _, _) = Build(backend);
+            model.List.Add(new FakeItem { Name = "crate", Position = new Vector3(4f, 0f, 0f), HalfExtent = 2f });
+
+            Glide(overlay, 0f);   // baseline over bare ground (box edge is at x=2, still 2 m away)
+            Glide(overlay, 2f);   // glide onto the box's near edge
+            Assert.Equal(new[] { AudioCue.CursorEnter }, audio.Cues);
+
+            overlay.Cursor.Position = new Vector3(2f, 0f, 0f); // on the edge, 2 m from the centre
             overlay.AnnounceCurrent();
             Assert.Equal(new[] { "crate" }, backend.Spoken);
         }
@@ -202,10 +228,25 @@ namespace DiscoAccess.Tests
         }
 
         [Fact]
-        public void InvisibleThing_NotHovered()
+        public void InaccessibleScenery_NotHovered()
         {
+            // The cursor senses only the actionable set, so scenery you cannot act on never blips - the whole
+            // point of the refactor: the cursor and Enter see the same set.
             var (overlay, audio, model, _, _) = Build();
-            model.List.Add(new FakeItem { Position = new Vector3(3f, 0f, 0f), Visible = false });
+            model.List.Add(new FakeItem { Position = new Vector3(3f, 0f, 0f), Accessible = false });
+
+            Glide(overlay, 0f);
+            Glide(overlay, 3f);
+            Assert.Empty(audio.Cues);
+        }
+
+        [Fact]
+        public void Orb_NotHovered()
+        {
+            // Orbs are accessible in the registry but their interaction is deferred, so Enter skips them; the
+            // cursor must skip them too, or it would name a thing Enter cannot act on.
+            var (overlay, audio, model, _, _) = Build();
+            model.List.Add(new FakeItem { Position = new Vector3(3f, 0f, 0f), Cat = WorldTaxonomy.Orb });
 
             Glide(overlay, 0f);
             Glide(overlay, 3f);

@@ -38,6 +38,14 @@ namespace DiscoAccess.Core.World.Overlays
             _has = true;
         }
 
+        /// <summary>Unpin the cursor so it rides the player's live position again, as on a cold read. Used
+        /// when the character is repositioned out from under the cursor (a scene load, a save load) and the
+        /// remembered spot is stale; the next glide re-pins it.</summary>
+        public void Reset()
+        {
+            _has = false;
+        }
+
         /// <summary>Glide one frame toward direction (<paramref name="dx"/>, <paramref name="dz"/>) on the
         /// XZ plane at <paramref name="speed"/> metres/second, navmesh-clamped. The direction need not be
         /// normalized (a held diagonal is fine); a zero direction is a no-op.</summary>

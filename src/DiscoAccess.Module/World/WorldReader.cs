@@ -29,6 +29,11 @@ namespace DiscoAccess.Module.World
         /// <summary>The cursor glide rate, metres per second.</summary>
         private const float GlideSpeed = 4f;
 
+        /// <summary>How far the character may move in one step and still count as walking. A single-step jump
+        /// past this is a reposition (a door, quicktravel, a loaded save), not a stride: at any walk/run speed
+        /// the character covers a fraction of a metre per frame, while a teleport is metres to hundreds.</summary>
+        private const float RepositionJump = 3f;
+
         /// <summary>The live reader, for dev-server introspection/driving.</summary>
         public static WorldReader Active;
 
@@ -42,6 +47,8 @@ namespace DiscoAccess.Module.World
         private readonly WalkInteract _walk;
         private readonly DistrictReader _districts;
         private bool _engaged;
+        private Snv _lastPlayer; // character position last in-world frame, to catch a reposition (load/teleport)
+        private bool _hasLastPlayer;
         private bool _ownsKeyboard;
         private bool _wasOwning;
         private bool _wasGliding;
@@ -114,8 +121,18 @@ namespace DiscoAccess.Module.World
         {
             bool inWorld = _inWorld; // resolved this frame by ResolveOwnership, which always runs first
             if (inWorld && !_engaged) { _overlay.OnEnter(); _engaged = true; }
-            else if (!inWorld && _engaged) { _overlay.OnExit(); _engaged = false; _walk.Abandon(); }
+            else if (!inWorld && _engaged) { _overlay.OnExit(); _engaged = false; _walk.Abandon(); _hasLastPlayer = false; }
             if (!inWorld) { _wasGliding = false; return; }
+
+            // A save load or scene transition repositions the character out from under the cursor, which keeps
+            // its old spot and is left stranded far from the player. The pause overlay a load runs behind keeps
+            // the CLEAR world view, so there is no world enter/exit to hang the recenter on - watch the
+            // character's own position instead. A one-step jump past a walk stride is a load or teleport, so
+            // unpin the cursor back onto the character (silent: the district readout speaks the new location).
+            Snv player = _overlay.Cursor.PlayerPosition;
+            if (_hasLastPlayer && Snv.Distance(player, _lastPlayer) > RepositionJump) _overlay.Cursor.Reset();
+            _lastPlayer = player;
+            _hasLastPlayer = true;
 
             float dt = Time.unscaledDeltaTime;
             _model.Tick(dt); // the sonar/scanner data layer, kept current whether or not we drive

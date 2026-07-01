@@ -38,13 +38,16 @@ namespace DiscoAccess.Module.World
         public string Category => WorldTaxonomy.Orb;
 
         // What the cursor reports: a world-anchored orb whose gameplay conditions are met, or that offers a
-        // morsel teaser - the orb-side equivalent of an entity's IsAccessible flag. Draw state (whether the
+        // morsel teaser - the orb-side equivalent of an entity's IsAccessible flag. An orb already triggered
+        // is excluded (WasShown): the game's own IsAccessible reflects only prerequisites/skill, never whether
+        // the orb has been read, so without this a shown orb stays under the cursor forever - reads its clue
+        // on Enter but never leaves, the freshness the sighted player sees fade away. Draw state (whether the
         // orb is currently rendered/orbiting) is deliberately NOT required: the cursor is the blind player's
         // eyes, so an accessible-but-undrawn orb (an orbital orb the character has not walked up to yet, like
         // the halogen-watermark orb read from across the plaza) must still be findable. The party-orbiting
         // thought-cabinet family (afterthought/obsession/paralyzer/thought) rides the character rather than
         // sitting in the world, so it is not a spatial cursor target and is excluded.
-        public bool IsAccessible => IsWorldAnchored && (_orb.IsAccessible || _orb.IsMorsel);
+        public bool IsAccessible => IsWorldAnchored && !_orb.WasShown() && (_orb.IsAccessible || _orb.IsMorsel);
         public bool IsVisible => IsAccessible;
 
         private bool IsWorldAnchored

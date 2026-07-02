@@ -17,14 +17,14 @@ namespace DiscoAccess.Core.World
     ///
     /// The list is rebuilt from the live registry on every keypress, never held across presses - the world
     /// set changes as rooms reveal and orbs stream - and the selection is continued by proxy identity, which
-    /// the registry keeps stable. The set is what a sighted player could see and act on right now:
-    /// <see cref="IWorldItem.IsAccessible"/> and <see cref="IWorldItem.IsVisible"/> both required (the same
-    /// gate the movement cursor's own sense uses; visibility carries the fog-of-war contract) and inside
-    /// the camera's visible frame - so every offered thing is rendered, revealed, and reachable by the
-    /// cursor, and discovery of the wider world is walking. Sorted nearest-first from the scan reference (the
-    /// movement cursor), so "next" walks outward, and re-sorting from a moved cursor is the "look around
-    /// from here" behaviour. Categories are <see cref="WorldTaxonomy.Scan"/> plus a synthetic Everything at
-    /// index 0; stepping categories skips empty ones (Everything always lands, even empty).
+    /// the registry keeps stable. The set is what a sighted player could see and act on right now
+    /// (<see cref="ScanScope"/>), judged from the PLAYER: the scan reference is the character's position,
+    /// never the movement cursor, because the only act a scanned thing supports is a walk-interact and that
+    /// walk starts at the character - a cursor-anchored scan offers things the player's own click refuses
+    /// (plant the cursor, press Enter, and it is the character walking over that reveals more). The cursor
+    /// stays a movement tool. Sorted nearest-first from the player, so "next" walks outward. Categories are
+    /// <see cref="WorldTaxonomy.Scan"/> plus a synthetic Everything at index 0; stepping categories skips
+    /// empty ones (Everything always lands, even empty).
     /// </summary>
     public sealed class Scanner
     {

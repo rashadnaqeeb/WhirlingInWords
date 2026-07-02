@@ -15,13 +15,15 @@ namespace DiscoAccess.Core.World.Overlays.Systems
     /// compress toward the audible floor, so the whole sweep lengthens with count but nothing is ever
     /// dropped (the scanner remains the tool for exact enumeration).
     ///
-    /// The sweep set is the scanner's own offering gate (<see cref="ScanScope"/>) filtered by the
-    /// per-category toggles and capped at <see cref="SweepRadius"/> from the cursor, so what pings is
-    /// always what can be browsed. The snapshot is an ordering for one sweep only, never state: each ping
-    /// re-reads the thing live (a despawned thing goes silent, a moved one sounds where it is), and each is
-    /// a tracked source re-placed while it sounds, following a gliding cursor. Stands down like the wall
-    /// tones - play gate closed, control lost (a cutscene), or a menu floating over the world - resetting
-    /// the sweep so control's return starts fresh.
+    /// The sweep set is the scanner's own offering gate (<see cref="ScanScope"/>, judged from the PLAYER
+    /// like every membership question) filtered by the per-category toggles - so what pings is always
+    /// exactly what can be browsed. The CURSOR is only the listening ear: pings place and fall off around
+    /// it, and the <see cref="SweepRadius"/> cap is measured from it, so gliding the cursor moves the
+    /// soundscape without ever changing what the world offers. The snapshot is an ordering for one sweep
+    /// only, never state: each ping re-reads the thing live (a despawned thing goes silent, a moved one
+    /// sounds where it is), and each is a tracked source re-placed while it sounds, following a gliding
+    /// cursor. Stands down like the wall tones - play gate closed, control lost (a cutscene), or a menu
+    /// floating over the world - resetting the sweep so control's return starts fresh.
     /// </summary>
     public sealed class SonarSystem : OverlaySystem
     {
@@ -127,9 +129,11 @@ namespace DiscoAccess.Core.World.Overlays.Systems
         // The sonifiable things around the cursor, ordered west to east by body position so the pan glides
         // across the sweep (two same-type things read as "left ... right", never a centred average). The
         // radius cap keeps a far-but-in-frame thing from flooring at minimum volume and sounding
-        // deceptively close - past it, it simply drops from the sweep until the cursor nears.
+        // deceptively close - past it, it simply drops from the sweep until the cursor nears. Membership
+        // is the player-anchored offering gate; only the radius (and the ping placement) is the cursor's.
         private void Snapshot(Vector3 cursor)
         {
+            Vector3 player = _env.PlayerPosition;
             _sweep.Clear();
             foreach (IWorldItem it in _model.Items)
             {
@@ -137,7 +141,7 @@ namespace DiscoAccess.Core.World.Overlays.Systems
                 {
                     if (!_categories(WorldTaxonomy.ScanCategory(it.Category))) continue;
                     if (Geo.DistanceXZ(it.Bounds.NearestPoint(cursor), cursor) > SweepRadius) continue;
-                    if (!ScanScope.Offered(it, cursor, _env)) continue;
+                    if (!ScanScope.Offered(it, player, _env)) continue;
                 }
                 catch (Exception e)
                 {

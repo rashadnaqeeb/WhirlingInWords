@@ -99,9 +99,9 @@ namespace DiscoAccess.Module.World
             _walk = new WalkInteract(host);
             _districts = new DistrictReader(host);
             // The review cursor: browses the same live registry the cursor senses, scoped by the same env
-            // (in-frame, unfogged), sorted from the movement cursor (the "look around from here" reference),
-            // speaking and pinging through the same pipes.
-            _scanner = new Scanner(_model, _env, () => _overlay.Cursor.Position, host.Speech, _sources);
+            // (in-frame, unfogged), anchored to the PLAYER - membership, sort, and spoken distances all
+            // measure from where the character stands, since the walk a scanned thing supports starts there.
+            _scanner = new Scanner(_model, _env, () => _env.PlayerPosition, host.Speech, _sources);
             _scanner.BindVolume(() => host.Settings.SonarVolume.Fraction);
             Active = this;
         }

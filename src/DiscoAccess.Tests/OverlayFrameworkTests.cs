@@ -136,6 +136,7 @@ namespace DiscoAccess.Tests
         [Fact]
         public void Glide_IntoFog_StaysAndBumps()
         {
+            // One 4 m stride lands 4 m deep in fog - past the fringe in a single step - so it refuses whole.
             var env = new FakeEnv { FogFn = p => p.X > 2f };
             var audio = new FakeAudioEngine();
             var overlay = NewOverlay(env, audio: audio);
@@ -143,6 +144,62 @@ namespace DiscoAccess.Tests
             overlay.Tick(1f, 1f, 0f, speed: 4f);
             Assert.Equal(env.Player, overlay.Cursor.Position);
             Assert.Equal(AudioCue.CursorImpassable, Assert.Single(audio.Cues));
+        }
+
+        [Fact]
+        public void Glide_EntersFogToTheFringe_ThenBumps()
+        {
+            // Fog starts at x=2; small strokes may nose FogFringe metres into it (the dim ground a sighted
+            // player sees past an unseen zone's edge) before the Fog block refuses.
+            var env = new FakeEnv { FogFn = p => p.X > 2f };
+            var cursor = new Cursor(env);
+
+            GlideOutcome last = default;
+            for (int i = 0; i < 100; i++)
+            {
+                last = cursor.Glide(1f, 0f, dt: 0.1f, speed: 1f); // 0.1 m strokes east
+                if (!last.Moved) break;
+            }
+            Assert.Equal(GlideBlock.Fog, last.Block);
+            Assert.InRange(cursor.Position.X, 2f + Cursor.FogFringe - 0.2f, 2f + Cursor.FogFringe + 0.01f);
+        }
+
+        [Fact]
+        public void FogFringe_ResetsOnClearGround()
+        {
+            var env = new FakeEnv { FogFn = p => p.X > 2f };
+            var cursor = new Cursor(env);
+
+            for (int i = 0; i < 100 && cursor.Glide(1f, 0f, 0.1f, 1f).Moved; i++) { } // reach the fringe limit
+            // Retreat is always passable: a stroke back toward the entry point shrinks the fringe distance,
+            // so a cursor at the limit is never frozen in the murk.
+            for (int i = 0; i < 30; i++) cursor.Glide(-1f, 0f, 0.1f, 1f);              // back out to x=1
+            Assert.True(cursor.Position.X < 2f);
+
+            GlideOutcome last = default;
+            for (int i = 0; i < 100; i++)
+            {
+                last = cursor.Glide(1f, 0f, 0.1f, 1f);
+                if (!last.Moved) break;
+            }
+            Assert.Equal(GlideBlock.Fog, last.Block); // a fresh full fringe, not a spent one
+            Assert.InRange(cursor.Position.X, 2f + Cursor.FogFringe - 0.2f, 2f + Cursor.FogFringe + 0.01f);
+        }
+
+        [Fact]
+        public void FogReveal_FreesAParkedCursor()
+        {
+            // The player walked out and revealed the zone while the cursor sat at its fringe limit: the
+            // next stroke moves freely, with no stale depth held over.
+            var env = new FakeEnv { FogFn = p => p.X > 2f };
+            var cursor = new Cursor(env);
+            for (int i = 0; i < 100 && cursor.Glide(1f, 0f, 0.1f, 1f).Moved; i++) { }
+
+            env.FogFn = _ => false;
+            var outcome = cursor.Glide(1f, 0f, dt: 1f, speed: 4f);
+            Assert.True(outcome.Moved);
+            Assert.Equal(GlideBlock.None, outcome.Block);
+            Assert.True(cursor.Position.X > 2f + Cursor.FogFringe);
         }
 
         [Fact]

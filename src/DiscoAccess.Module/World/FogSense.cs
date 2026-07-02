@@ -26,7 +26,9 @@ namespace DiscoAccess.Module.World
             Unseen,
         }
 
-        /// <summary>The zone state above a point, read live (a room reveals the frame its door opens).</summary>
+        /// <summary>The zone state above a point, read live (a zone flips ACTIVE the frame the player
+        /// steps under its volume - nothing reveals a zone on a door opening; the lit sliver seen through
+        /// an open door is the unseen shroud's own soft edge, not a status change).</summary>
         internal static ZoneState At(Vector3 point)
         {
             if (!Physics.Raycast(point, Vector3.up, out RaycastHit hit, ProbeDistance, FogLayerMask))

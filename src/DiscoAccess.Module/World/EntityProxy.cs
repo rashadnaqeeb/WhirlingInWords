@@ -682,7 +682,15 @@ namespace DiscoAccess.Module.World
         public bool Interact(bool run)
         {
             var data = new Interactable.ClickEventData { isDoubleClick = run };
-            return _e.Interact(data);
+            if (_e.Interact(data)) return true;
+            // An Interact override can muddy the returned bool with its own reaction verdict: KimDoor
+            // returns base-click-engaged AND its story gate (night after the 3rd day plus Lua state),
+            // so on an ordinary day the click walks the party over and tries the locked knob while
+            // returning false - not the "pricing refused" the walk verb speaks as can't-reach. The
+            // click itself engaged exactly when the base GameEntity.Interact's own gates pass:
+            // interactable, world input live, and the approach priced finite.
+            GameController gc = GameController.Singleton;
+            return gc != null && !gc.IsWorldInputDisabled() && _e.CanInteract && ClickWouldAct();
         }
 
         // Map the entity's runtime type onto a taxonomy category. Order matters where types nest (Curtains

@@ -42,6 +42,8 @@ namespace DiscoAccess.Tests
             public Vector3 InteractionPoint(Vector3 from) => Position;
             public bool Reachable { get; set; } = true;
             public bool ReachableFrom(Vector3 from) => Reachable;
+            public bool ClickPriced { get; set; }
+            public bool ReachIsClickPriced => ClickPriced;
             public bool Interact() => false;
         }
 
@@ -270,6 +272,28 @@ namespace DiscoAccess.Tests
             Assert.StartsWith("corridor crate; ", speech.Spoken[^1]);
             scanner.StepItem(1); // wraps: the severed door and stairs never land
             Assert.StartsWith("own door; ", speech.Spoken[^1]);
+        }
+
+        [Fact]
+        public void SameLevelSealedClickPricedThing_IsNotOffered_ButMarkerlessStillPings()
+        {
+            var (scanner, model, speech, _, _) = Build();
+            // The Gurdis Goats pinball: a talking-prop interactable on the player's own level, in frame,
+            // unfogged, but sealed behind a wall so its click prices infinite. Because its reach verdict is
+            // the game's own pricing (ReachIsClickPriced), a false is trusted and it drops - unlike a
+            // markerless woodpile behind the same wall, whose geometry over-rejects, so it stays offered.
+            var pinball = At(3f, 0f, "pinball machine", WorldTaxonomy.Interactable);
+            pinball.ClickPriced = true;
+            pinball.Reachable = false;
+            model.List.Add(pinball);
+            var woodpile = At(4f, 0f, "woodpile", WorldTaxonomy.Interactable);
+            woodpile.Reachable = false; // markerless: not click-priced, stays permissive
+            model.List.Add(woodpile);
+
+            scanner.StepItem(1);
+            Assert.StartsWith("woodpile; ", speech.Spoken[^1]);
+            scanner.StepItem(1); // wraps on the one offered item; the sealed pinball never lands
+            Assert.StartsWith("woodpile; ", speech.Spoken[^1]);
         }
 
         [Fact]

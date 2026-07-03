@@ -62,6 +62,16 @@ namespace DiscoAccess.Core.World
         /// unreachable from here can become reachable once the character moves.</summary>
         bool ReachableFrom(Vector3 from);
 
+        /// <summary>Whether <see cref="ReachableFrom"/>'s verdict here is the game's own click pricing - a
+        /// person, or a thing with authored interaction stand-spots - rather than the markerless
+        /// standing-ground geometry that over-rejects a walled-off same-level thing. The same-level scanner
+        /// and cursor gates skip the reach test by default (a same-level woodpile behind a fence still pings,
+        /// and its walk-interact reports the wall), because that geometry cannot be trusted to say "no". A
+        /// click-priced thing CAN be: the game refuses the click exactly when a sighted player's would fail,
+        /// so a false here is authoritative and the same-level gate drops the thing (the sealed-room pinball).
+        /// False leaves the thing on the permissive same-level path unchanged.</summary>
+        bool ReachIsClickPriced { get; }
+
         /// <summary>Trigger the game's interaction for this thing (auto-path and act). Returns whether
         /// something was triggered.</summary>
         bool Interact();

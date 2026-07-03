@@ -35,6 +35,7 @@ namespace DiscoAccess.Tests
             public bool IsOpen => false;
             public Vector3 InteractionPoint(Vector3 from) => Position;
             public bool ReachableFrom(Vector3 from) => true;
+            public bool ReachIsClickPriced => false;
             public bool Interact() => false;
         }
 

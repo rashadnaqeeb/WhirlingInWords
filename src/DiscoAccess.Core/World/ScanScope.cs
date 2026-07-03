@@ -23,16 +23,18 @@ namespace DiscoAccess.Core.World
     /// placement and sweep radius - while reading this same player-anchored set.
     ///
     /// Reachability is asked per kind. A PERSON, a CROSSING (door, exit - the things that systematically
-    /// sit severed behind other closed doors, which carve the walkable mesh), and anything past the
-    /// same-level pivot slack (<see cref="Overlays.Systems.ObjectCueSystem"/>) must pass ReachableFrom -
-    /// the game's own click verdict for marker-bearing things and people (pricing to the authored
-    /// stand-spots: the balcony smoker, spoken to from the street four metres below, stays offered; Cuno
-    /// beyond the yard fence drops until a path opens; the corridor doors return the moment the player's
-    /// own door opens), and the standing-ground walk-connectivity geometry for the markerless rest (the
-    /// crate up the harbour gate connects via its stairs; the mezzanine door over the bar floor does not).
-    /// A same-level non-crossing thing is offered without a path test: a walled-off woodpile still pings,
-    /// and its walk-interact reports the wall - the known over-rejection traps live here, so the gate
-    /// stays permissive.
+    /// sit severed behind other closed doors, which carve the walkable mesh), a CLICK-PRICED thing
+    /// (<see cref="IWorldItem.ReachIsClickPriced"/> - marker-bearing, whose reach verdict is the game's own
+    /// click pricing), and anything past the same-level pivot slack
+    /// (<see cref="Overlays.Systems.ObjectCueSystem"/>) must pass ReachableFrom - the game's own click
+    /// verdict for marker-bearing things and people (pricing to the authored stand-spots: the balcony
+    /// smoker, spoken to from the street four metres below, stays offered; Cuno beyond the yard fence drops
+    /// until a path opens; the corridor doors return the moment the player's own door opens; the sealed-room
+    /// pinball drops though it sits on the player's own level), and the standing-ground walk-connectivity
+    /// geometry for the markerless rest (the crate up the harbour gate connects via its stairs; the
+    /// mezzanine door over the bar floor does not). A same-level markerless non-crossing thing is offered
+    /// without a path test: a walled-off woodpile still pings, and its walk-interact reports the wall - the
+    /// known over-rejection traps live in that geometry, so the gate stays permissive for it.
     /// </summary>
     public static class ScanScope
     {
@@ -43,6 +45,7 @@ namespace DiscoAccess.Core.World
             if (!env.InView(nearest)) return false;
             if (it.Category == WorldTaxonomy.Npc
                 || it.Category == WorldTaxonomy.Door || it.Category == WorldTaxonomy.Exit
+                || it.ReachIsClickPriced
                 || Math.Abs(nearest.Y - from.Y) > Overlays.Systems.ObjectCueSystem.SameLevelSlack)
                 return it.ReachableFrom(from);
             return true;

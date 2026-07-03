@@ -529,9 +529,14 @@ namespace DiscoAccess.Module.World
         // stand-point search is a 3D radius that can grab a spot on an unrelated level over the thing's
         // head (the Whirling front door's 3 m radius reaches the balcony floor above it, and the oracle
         // then paths two metres to the balcony edge and calls the ground-floor door reachable).
+        // Whether ReachableFrom prices the game's own click (a person, or a thing with authored interaction
+        // stand-spots) rather than falling back to the markerless standing-ground geometry - the reliable
+        // verdict the same-level scanner and cursor gates trust to say "no" (see IWorldItem.ReachIsClickPriced).
+        public bool ReachIsClickPriced => Category == WorldTaxonomy.Npc || InteractionMarkers.Length > 0;
+
         public bool ReachableFrom(Vector3 from)
         {
-            if (Category == WorldTaxonomy.Npc || InteractionMarkers.Length > 0) return ClickWouldAct();
+            if (ReachIsClickPriced) return ClickWouldAct();
             if (!StandingGround(out UnityEngine.Vector3 ground) && !MooredGround(from, out ground))
                 return false;
             var path = new UnityEngine.AI.NavMeshPath();

@@ -190,13 +190,16 @@ namespace DiscoAccess.Core.World.Overlays.Systems
                 // Height-reachability gate. XZ-only detection would also put the cursor "on" a thing hanging
                 // well above (or below) the ground it is clamped to - the Whirling balcony door overhanging the
                 // plaza reads as under the cursor though its body sits metres overhead. Drop such a candidate
-                // only when it is BOTH past the same-level slack AND off reachable ground (ReachableFrom): a
-                // staircase or step-exit stands on connected ground and is kept, a same-level thing within the
-                // slack (an NPC behind a bar counter, whom every oracle over-rejects) is kept without any
-                // path test, an orb overhead is always reachable and is kept, and a cross-level conversation
-                // (the balcony smoker spoken to from below) is kept through the person fallback. The path test
-                // runs only for an off-slack candidate, so it is rare, not per item per frame.
-                if (System.Math.Abs(np.Y - cursor.Y) > SameLevelSlack && !it.ReachableFrom(player)) continue;
+                // when it is off reachable ground (ReachableFrom) AND either past the same-level slack OR
+                // click-priced (its reach verdict is the game's own pricing, trustworthy on the same level -
+                // the sealed-room pinball): a staircase or step-exit stands on connected ground and is kept, a
+                // same-level MARKERLESS thing within the slack (an NPC behind a bar counter, whom every
+                // geometry oracle over-rejects) is kept without any path test, an orb overhead is always
+                // reachable and is kept, and a cross-level conversation (the balcony smoker spoken to from
+                // below) is kept through the person fallback. The path test runs only for an off-slack or
+                // click-priced candidate, so it is rare, not per item per frame.
+                if ((System.Math.Abs(np.Y - cursor.Y) > SameLevelSlack || it.ReachIsClickPriced)
+                    && !it.ReachableFrom(player)) continue;
                 bestDist = d; bestBody = body; best = it;
             }
             return best;

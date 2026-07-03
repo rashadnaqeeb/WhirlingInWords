@@ -60,6 +60,10 @@ namespace DiscoAccess.Tests
             // hanging out of reach (a balcony door over the plaza).
             public bool Reachable { get; set; } = true;
             public bool ReachableFrom(Vector3 from) => Reachable;
+            // Whether the reach verdict is the game's own click pricing (trustworthy on the same level).
+            // Default false: a same-level thing is kept without a path test unless a test opts in.
+            public bool ClickPriced { get; set; }
+            public bool ReachIsClickPriced => ClickPriced;
             public bool Interact() => false;
         }
 

@@ -152,6 +152,11 @@ namespace DiscoAccess.Module.World
         // walk to the spot the trigger snaps to, or a partial walk whose endpoint still falls inside the
         // sphere - an offered orb is thereby always flat-arrivable too (flat distance never exceeds 3D).
         // A thought-family orb rides the character and needs no walk.
+        // An orb is not MovementCommand-priced (its reach is its own trigger-sphere path test, not the
+        // click pricing), so it stays on the same-level gates' permissive path exactly as before: a
+        // world orb sits overhead and is already judged off-level, a thought orb rides the character.
+        public bool ReachIsClickPriced => false;
+
         public bool ReachableFrom(Vector3 from)
         {
             if (IsThoughtFamily) return true;

@@ -60,11 +60,11 @@ namespace DiscoAccess.Tests
         }
 
         [Fact]
-        public void WallToneVolume_DefaultsLowAndConvertsToFraction()
+        public void WallToneVolume_DefaultsToHalfAndConvertsToFraction()
         {
             var settings = new ModSettings(new FakeStore());
-            Assert.Equal(5, settings.WallToneVolume.Value);
-            Assert.Equal(0.05f, settings.WallToneVolume.Fraction);
+            Assert.Equal(50, settings.WallToneVolume.Value);
+            Assert.Equal(0.5f, settings.WallToneVolume.Fraction);
         }
 
         [Fact]

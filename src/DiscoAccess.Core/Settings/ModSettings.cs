@@ -25,8 +25,8 @@ namespace DiscoAccess.Core.Settings
         /// queued so they never cut off the player. Off leaves the world silent of ambient talk.</summary>
         public ToggleSetting ReadAmbientDialogue { get; }
 
-        /// <summary>The loudness of the directional wall tones, a 0..100 percent. Defaults low (5%): the tones
-        /// are an ambient orientation bed, not a foreground cue, so they sit under speech until turned up.</summary>
+        /// <summary>The loudness of the directional wall tones, a 0..100 percent, defaulting to 50: an
+        /// orientation bed loud enough to hear without competing with speech.</summary>
         public RangeSetting WallToneVolume { get; }
 
         /// <summary>When on, wall tones sound continuously while in the world; when off (the default) they
@@ -67,7 +67,7 @@ namespace DiscoAccess.Core.Settings
             ReadAmbientDialogue = Add(new ToggleSetting(
                 "read_ambient_dialogue", () => SettingReadAmbientDialogue, defaultValue: true, store));
             WallToneVolume = Add(new RangeSetting(
-                "wall_tone_volume", () => SettingWallToneVolume, defaultValue: 5, step: 5, store));
+                "wall_tone_volume", () => SettingWallToneVolume, defaultValue: 50, step: 5, store));
             WallTonesContinuous = Add(new ToggleSetting(
                 "wall_tones_continuous", () => SettingWallTonesContinuous, defaultValue: false, store));
             SonarVolume = Add(new RangeSetting(

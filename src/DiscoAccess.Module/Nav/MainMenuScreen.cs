@@ -3,7 +3,6 @@ using DiscoAccess.Core.Strings;
 using DiscoAccess.Core.UI.Nav;
 using Sunshine.Views;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace DiscoAccess.Module.Nav
@@ -12,8 +11,11 @@ namespace DiscoAccess.Module.Nav
     /// The title main menu as a single vertical list of its sidebar buttons (Continue, New Game, Load
     /// Game, Collage, Options, Quit). The buttons are the active, interactable Selectable children of the
     /// menu's content container, in sibling (visual) order; hidden entries (Quick Save, Save Game, the
-    /// return-to-title Main Menu button) are inactive and skipped. The container is located from the live
-    /// selection, which the game still holds at the menu when focus mode engages. The game reuses this
+    /// return-to-title Main Menu button) are inactive and skipped. The container is located by scanning
+    /// for the menu's own buttons (their shared parent), not the game's live selection: the selection is
+    /// absent when the menu opens mid-save (the pause view captures a save thumbnail as it opens, and an
+    /// Escape landing in that hitch opens the menu before the game assigns a selection), and keying off it
+    /// there left us reading an empty list while owning the keyboard, a soft-lock. The game reuses this
     /// view for the in-game pause menu too; <see cref="PauseMenuScreen"/> handles that case, so this is
     /// the fallback for the title screen and is not sealed.
     /// </summary>
@@ -59,24 +61,15 @@ namespace DiscoAccess.Module.Nav
             return list;
         }
 
-        /// <summary>The menu's button container, located from the live selection (its parent), or null
-        /// when nothing is selected yet.</summary>
+        /// <summary>The menu's button container, located by scanning for the menu's own buttons and
+        /// taking their shared parent, or null when the menu is not present. Independent of the game's
+        /// live selection, which is absent when the menu opens mid-save.</summary>
         protected static Transform MenuContent()
         {
-            Selectable start = CurrentSelectable();
-            return start != null ? start.transform.parent : null;
-        }
-
-        // The game's current selection: NavigationManager (it keeps the menu selection even after we
-        // disable it), falling back to the EventSystem ground truth.
-        private static Selectable CurrentSelectable()
-        {
-            var nav = NavigationManager.Singleton;
-            Selectable sel = nav != null ? nav.GetCurrentSelectedSelectable() : null;
-            if (sel != null) return sel;
-            var es = EventSystem.current;
-            var go = es != null ? es.currentSelectedGameObject : null;
-            return go != null ? go.GetComponent<Selectable>() : null;
+            foreach (MainMenuButton button in Resources.FindObjectsOfTypeAll<MainMenuButton>())
+                if (button.gameObject.activeInHierarchy)
+                    return button.transform.parent;
+            return null;
         }
     }
 }

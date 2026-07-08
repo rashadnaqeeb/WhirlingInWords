@@ -269,9 +269,10 @@ namespace DiscoAccess.Module
             // menus, walk in the world), west opens the character sheet, bumpers are Shift+Tab/Tab in
             // menus and the scanner step in the world, triggers cycle the game's info screens in menus
             // and are the J/I scan verbs in the world, stick clicks are the 1/2 hand items, Start
-            // pauses, and the dpad left/right follow the arrow keys (heals outside pure menus). The
-            // left stick doubles as UI navigation in menus and the world glide vector in free-roam;
-            // the two categories are never live together.
+            // pauses, the dpad left/right follow the arrow keys (heals outside pure menus), dpad up
+            // recenters, and right-stick flicks speak the status readouts. The left stick doubles as
+            // UI navigation in menus and the world glide vector in free-roam; the two categories are
+            // never live together.
             AddPad(UiActions.Up, Pad.DPadUp, Pad.LeftStickUp);
             AddPad(UiActions.Down, Pad.DPadDown, Pad.LeftStickDown);
             AddPad(UiActions.Left, Pad.DPadLeft, Pad.LeftStickLeft);
@@ -292,6 +293,7 @@ namespace DiscoAccess.Module
             AddPad(WorldActions.Stop, Pad.Action2);
             AddPad(WorldActions.Walk, Pad.Action4);
             AddPad(WorldActions.OpenCharacterSheet, Pad.Action3);
+            AddPad(WorldActions.Recenter, Pad.DPadUp);
             AddPad(WorldActions.Pause, Pad.Command);
             AddPad(WorldActions.ScanPrev, Pad.LeftBumper);
             AddPad(WorldActions.ScanNext, Pad.RightBumper);
@@ -304,6 +306,14 @@ namespace DiscoAccess.Module
             // UI Left/Right in a dialogue, exactly like the keyboard heal arrows.
             AddPad(WorldActions.HealEndurance, Pad.DPadLeft);
             AddPad(WorldActions.HealVolition, Pad.DPadRight);
+
+            // The right stick is the status compass: a flick speaks one readout (up health, right money,
+            // down time, left location). Status category, so the flicks stay live in dialogue like the
+            // heals; a flick never collides with the stick's click, the right-hand item.
+            AddPad(WorldActions.ReadHealth, Pad.RightStickUp);
+            AddPad(WorldActions.ReadMoney, Pad.RightStickRight);
+            AddPad(WorldActions.ReadTime, Pad.RightStickDown);
+            AddPad(WorldActions.ReadLocation, Pad.RightStickLeft);
 
             // The live category each frame: the UI category while our navigator owns the keyboard (a
             // registered screen, no popup up), plus the Status keys when that screen wants them (the

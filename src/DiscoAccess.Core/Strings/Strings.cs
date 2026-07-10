@@ -27,7 +27,12 @@ namespace DiscoAccess.Core.Strings
         /// its value in the target language (the live game's I2 sources, or
         /// GameLocalization.Translate) and reuse its vocabulary rather than inventing a new word.
         /// Values are spoken by a screen reader: terse, lowercase unless shown otherwise, no
-        /// decorative punctuation.</summary>
+        /// decorative punctuation.
+        /// Where a value is spoken appended after a noun the RUNTIME chooses - an item's name, an
+        /// equipment slot's caption, a health bar's name, a scanner category word - a gendered
+        /// language cannot inflect it to agree, because the noun varies. Such entries say so; give
+        /// them a phrase carrying its own head noun ("a new item") or an invariant one ("at a
+        /// critical level"), never a bare adjective.</summary>
         internal static readonly KeyValuePair<string, string>[] Defaults =
         {
             // Spoken once when the mod finishes initializing at game launch.
@@ -356,11 +361,13 @@ namespace DiscoAccess.Core.Strings
             // for a gun), each spoken before that slot's contents.
             D("InventoryKeys", "keys"),
             D("InventoryBullets", "bullets"),
-            // An equipment slot with nothing worn in it; adjective.
+            // An equipment slot with nothing worn in it, spoken after the slot's caption
+            // ("gloves, empty"), whose gender varies: carry a head noun rather than agree.
             D("InventorySlotEmpty", "empty"),
             // An item category with nothing in it.
             D("InventoryNoItems", "no items"),
-            // Adjective appended to an item acquired since the player last looked (the game's glow dot).
+            // Appended to an item acquired since the player last looked (the game's glow dot), after
+            // the item's own name, whose gender varies: carry a head noun rather than agree.
             D("InventoryFresh", "new"),
             // Fallback for the game's consumable-effects header (I2
             // TOOLTIP_HOVER_SUBSTANCE_USED_EFFECTS), spoken before what using the item does; used only
@@ -437,7 +444,8 @@ namespace DiscoAccess.Core.Strings
             D("WorldScanItemsGroup", "items"),
             // Landing line when switching scan category; {0} = the category name, {1} = the count.
             D("WorldScanCategoryCount", "{0}, {1}"),
-            // The same with nothing in the category; {0} = the category name.
+            // The same with nothing in the category; {0} = the category name, whose gender varies
+            // across the categories above, so the word for "none" must not agree with it.
             D("WorldScanCategoryEmpty", "{0}, none"),
             // Spoken when the act-on-scanned key fires before anything was scanned.
             D("WorldScanNothing", "nothing scanned"),
@@ -568,10 +576,13 @@ namespace DiscoAccess.Core.Strings
             // A container or door that refuses to open; adjective. Fallback for the game's tooltip
             // (I2 TOOLTIP_LOCKED "Locked"), used only if the term fails to resolve.
             D("StatusLocked", "locked"),
-            // A door standing open; adjective (only the open state is spoken; closed is assumed).
+            // A door standing open, spoken after its name (only the open state is spoken; closed is
+            // assumed). The state exists only on doors, so a gendered language agrees with its own
+            // word for "door".
             D("StatusOpen", "open"),
             // A person with new dialogue waiting (the game pulses Kim's portrait for this); spoken
-            // after the person's name: "Kim Kitsuragi, has something to say".
+            // after the person's name: "Kim Kitsuragi, has something to say". Only Kim has the
+            // mechanic, so a gendered language may agree with him.
             D("StatusHasSomethingToSay", "has something to say"),
 
             // World status readouts (spoken on their read keys).
@@ -595,7 +606,8 @@ namespace DiscoAccess.Core.Strings
             // The heal-or-die prompt when a bar hits zero and the game pauses for a timed heal window:
             // {0} = the game's localized bar name (Health heals with the left arrow key, Morale with
             // the right). Two whole sentences rather than a composed direction word, so each translates
-            // as a sentence.
+            // as a sentence. The two bar names can differ in gender, so "critical" must either be
+            // invariant or be recast around a noun of its own ("at a critical level").
             D("CrisisHealLeft", "{0} critical, press left arrow to heal"),
             D("CrisisHealRight", "{0} critical, press right arrow to heal"),
 

@@ -6,6 +6,8 @@
 # journal = journal, character sheet = fiche du personnage, locked = verrouille, currency =
 # real, archetype = archetype, signature skill = talent-cle, experience = experience.
 # thing = objet, item (scanner group) = article.
+# Words spoken after a noun the game picks (an item, a category) carry their own head noun
+# instead of agreeing with it: nouvel objet, rien.
 _plural = french
 ModLoaded = Accessibilité Disco Elysium chargée
 ModuleFailed = Échec du chargement des fonctions DiscoAccess
@@ -180,7 +182,7 @@ InventoryKeys = clés
 InventoryBullets = balles
 InventorySlotEmpty = vide
 InventoryNoItems = aucun objet
-InventoryFresh = nouveau
+InventoryFresh = nouvel objet
 ItemUseEffects = effets à l'utilisation
 ItemPawnFor = mettre en gage pour
 PawnshopMoney = argent {0}
@@ -218,7 +220,7 @@ WorldScanExits = sorties
 WorldScanPeopleGroup = personnes et objets interactifs
 WorldScanItemsGroup = articles
 WorldScanCategoryCount = {0}, {1}
-WorldScanCategoryEmpty = {0}, aucun
+WorldScanCategoryEmpty = {0}, rien
 WorldScanNothing = rien de scanné
 WorldThingDoor = porte
 WorldThingGate = portail
@@ -280,7 +282,7 @@ WorldOrbHolds = retenu par un orbe, résolvez-le pour bouger
 WorldNoControl = cinématique en cours
 WorldContainerClosed = conteneur fermé
 StatusLocked = verrouillé
-StatusOpen = ouvert
+StatusOpen = ouverte
 StatusHasSomethingToSay = a quelque chose à dire
 WorldMoney = {0},{1} reál
 WorldHealth = {0} {1}/{2}, {3}; {4} {5}/{6}, {7}

@@ -8,6 +8,8 @@
 # archetype = arquetipo, signature skill = habilidad principal, experience = experiencia,
 # adjust abilities = ajustar aptitudes, floor = planta. thing = objeto, item (scanner
 # group) = articulo.
+# Words spoken after a noun the game picks (an item, a slot, a category) carry their own
+# head noun instead of agreeing with it: nuevo objeto, sin objeto, nada.
 _plural = english
 ModLoaded = Accesibilidad de Disco Elysium cargada
 ModuleFailed = Error al cargar las funciones de DiscoAccess
@@ -180,9 +182,9 @@ InventoryItemsLabel = objetos
 InventoryStatsLabel = estadísticas
 InventoryKeys = llaves
 InventoryBullets = balas
-InventorySlotEmpty = vacío
+InventorySlotEmpty = sin objeto
 InventoryNoItems = sin objetos
-InventoryFresh = nuevo
+InventoryFresh = nuevo objeto
 ItemUseEffects = efectos al usar
 ItemPawnFor = empeñar por
 PawnshopMoney = dinero {0}
@@ -220,7 +222,7 @@ WorldScanExits = salidas
 WorldScanPeopleGroup = personas y objetos interactivos
 WorldScanItemsGroup = artículos
 WorldScanCategoryCount = {0}, {1}
-WorldScanCategoryEmpty = {0}, ninguno
+WorldScanCategoryEmpty = {0}, nada
 WorldScanNothing = nada escaneado
 WorldThingDoor = puerta
 WorldThingGate = verja

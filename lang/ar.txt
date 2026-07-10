@@ -4,6 +4,8 @@
 # (أبيض/أحمر), thought cabinet = كابينة الأفكار, thought = فكرة, health = الصحة,
 # morale = المعنويات, inventory = المخزون, journal = دفتر اليوميات, locked = مغلق,
 # currency = ريال, archetype = نموذج.
+# Words spoken after a noun the game picks (an item, a slot) carry their own head noun
+# instead of agreeing with it: غرض جديد, خانة فارغة.
 _plural = arabic
 ModLoaded = تم تحميل إتاحة ديسكو إليزيوم
 ModuleFailed = فشل تحميل ميزات ديسكو أكسس
@@ -176,9 +178,9 @@ InventoryItemsLabel = الأغراض
 InventoryStatsLabel = الإحصائيات
 InventoryKeys = المفاتيح
 InventoryBullets = الرصاص
-InventorySlotEmpty = فارغ
+InventorySlotEmpty = خانة فارغة
 InventoryNoItems = لا أغراض
-InventoryFresh = جديد
+InventoryFresh = غرض جديد
 ItemUseEffects = آثار الاستخدام
 ItemPawnFor = رهن مقابل
 PawnshopMoney = المال {0}

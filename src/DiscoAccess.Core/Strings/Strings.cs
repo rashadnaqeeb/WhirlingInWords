@@ -56,8 +56,9 @@ namespace DiscoAccess.Core.Strings
             // Jump to the first / last entry of the focused list (Home / End).
             D("InputJumpFirst", "Jump to first"),
             D("InputJumpLast", "Jump to last"),
-            // A control's secondary action (e.g. deleting the focused save).
-            D("InputSecondary", "Secondary action"),
+            // The focused control's secondary action (Backspace), named for its main use: acting on
+            // the focused item (equip, use, take). Match the interact verb of InputWorldInteract.
+            D("InputSecondary", "Interact with item"),
             // Cycle the open info screen to the previous/next one (character sheet, inventory, journal,
             // thought cabinet) - the game's own controller trigger cycle, re-provided.
             D("InputScreenPrev", "Previous game screen"),
@@ -71,7 +72,7 @@ namespace DiscoAccess.Core.Strings
             D("InputWorldRecenter", "Recenter cursor on character"),
             D("InputWorldInteract", "Walk and interact"),
             D("InputWorldWalk", "Walk to cursor without interacting"),
-            D("InputWorldStop", "Stop"),
+            D("InputWorldStop", "Stop character"),
             D("InputWorldScanNext", "Scanner next thing"),
             D("InputWorldScanPrev", "Scanner previous thing"),
             D("InputWorldScanNextCategory", "Scanner next category"),
@@ -107,6 +108,54 @@ namespace DiscoAccess.Core.Strings
             D("InputWorldReadHealth", "Read health"),
             D("InputWorldReadLocation", "Read location"),
             D("InputWorldReadExperience", "Read experience"),
+            // Opens the mod's key-help screen: the list of every key live in the current context.
+            D("InputKeyHelp", "Key help"),
+            // Dialogue viewer only: a number-row digit moves the cursor to that numbered response.
+            // Spoken as a key-help line with KeyHelpKeysDigits as its keys phrase.
+            D("InputDialogueNumberJump", "Jump to response by number"),
+
+            // The key-help screen's lines. One line per reachable action: {0} the action's description
+            // (the Input* strings above), {1} its key or keys ("Read time, T").
+            D("KeyHelpLine", "{0}, {1}"),
+            // Spoken names of keyboard keys and modifiers, composed into a chord with spaces
+            // ("Control Page down"). Use the words a screen-reader user knows the keys by.
+            D("KeyControl", "Control"),
+            D("KeyShift", "Shift"),
+            D("KeyAlt", "Alt"),
+            D("KeyUpArrow", "Up arrow"),
+            D("KeyDownArrow", "Down arrow"),
+            D("KeyLeftArrow", "Left arrow"),
+            D("KeyRightArrow", "Right arrow"),
+            D("KeyReturn", "Enter"),
+            D("KeyKeypadEnter", "Numpad enter"),
+            D("KeyEscape", "Escape"),
+            D("KeyBackspace", "Backspace"),
+            D("KeyTab", "Tab"),
+            D("KeyHome", "Home"),
+            D("KeyEnd", "End"),
+            D("KeySpace", "Space"),
+            D("KeyComma", "Comma"),
+            D("KeyPeriod", "Period"),
+            D("KeySlash", "Slash"),
+            D("KeyPageUp", "Page up"),
+            D("KeyPageDown", "Page down"),
+            // Key-help groups: related keys that read as one line instead of several. The group label
+            // fills KeyHelpLine's {0} slot; the two direction fans also author its keys phrase, the {1}
+            // slot ("Navigate, arrow keys"), while the pair groups below derive theirs from the live
+            // bindings ("Jump to first or last, Home, End").
+            D("KeyHelpGroupNavigate", "Navigate"),
+            D("KeyHelpKeysArrows", "arrow keys"),
+            D("KeyHelpGroupMoveCursor", "Move cursor"),
+            D("KeyHelpKeysWasd", "W A S D"),
+            // The dialogue number jump's keys phrase (the number-row range).
+            D("KeyHelpKeysDigits", "1 to 9"),
+            D("KeyHelpGroupNextPrevControl", "Next and previous control"),
+            D("KeyHelpGroupJumpFirstLast", "Jump to first or last"),
+            D("KeyHelpGroupScanThing", "Scanner next and previous thing"),
+            D("KeyHelpGroupScanCategory", "Scanner next and previous category"),
+            D("KeyHelpGroupScanPeople", "Scanner people and interactables"),
+            D("KeyHelpGroupScanItems", "Scanner items"),
+            D("KeyHelpGroupScanExits", "Scanner exits"),
 
             // Control role and status words.
             // Nouns naming a control's type, spoken after its caption ("Continue, button").
@@ -281,6 +330,8 @@ namespace DiscoAccess.Core.Strings
             D("ScreenModMenu", "mod menu"),
             // The mod's own bookmarks menu (named world positions; Ctrl+B).
             D("ScreenBookmarks", "bookmarks"),
+            // The mod's own key-help screen (Shift+F1): the keys live in the current context.
+            D("ScreenKeyHelp", "key help"),
 
             // Mod settings labels (rows in the mod menu; sentence case). "Wall tones" are the mod's
             // audio cue for walls near the cursor; the "sonar" is its periodic audio sweep over nearby
@@ -791,6 +842,44 @@ namespace DiscoAccess.Core.Strings
         public static string InputWorldReadHealth => T("InputWorldReadHealth");
         public static string InputWorldReadLocation => T("InputWorldReadLocation");
         public static string InputWorldReadExperience => T("InputWorldReadExperience");
+        public static string InputKeyHelp => T("InputKeyHelp");
+        public static string InputDialogueNumberJump => T("InputDialogueNumberJump");
+
+        // The key-help screen's lines (see KeyHelp for the composition).
+        /// <summary>One key-help line: an action's description and its key or keys.</summary>
+        public static string KeyHelpLine(string action, string keys) => F("KeyHelpLine", action, keys);
+        public static string KeyControl => T("KeyControl");
+        public static string KeyShift => T("KeyShift");
+        public static string KeyAlt => T("KeyAlt");
+        public static string KeyUpArrow => T("KeyUpArrow");
+        public static string KeyDownArrow => T("KeyDownArrow");
+        public static string KeyLeftArrow => T("KeyLeftArrow");
+        public static string KeyRightArrow => T("KeyRightArrow");
+        public static string KeyReturn => T("KeyReturn");
+        public static string KeyKeypadEnter => T("KeyKeypadEnter");
+        public static string KeyEscape => T("KeyEscape");
+        public static string KeyBackspace => T("KeyBackspace");
+        public static string KeyTab => T("KeyTab");
+        public static string KeyHome => T("KeyHome");
+        public static string KeyEnd => T("KeyEnd");
+        public static string KeySpace => T("KeySpace");
+        public static string KeyComma => T("KeyComma");
+        public static string KeyPeriod => T("KeyPeriod");
+        public static string KeySlash => T("KeySlash");
+        public static string KeyPageUp => T("KeyPageUp");
+        public static string KeyPageDown => T("KeyPageDown");
+        public static string KeyHelpGroupNavigate => T("KeyHelpGroupNavigate");
+        public static string KeyHelpKeysArrows => T("KeyHelpKeysArrows");
+        public static string KeyHelpGroupMoveCursor => T("KeyHelpGroupMoveCursor");
+        public static string KeyHelpKeysWasd => T("KeyHelpKeysWasd");
+        public static string KeyHelpKeysDigits => T("KeyHelpKeysDigits");
+        public static string KeyHelpGroupNextPrevControl => T("KeyHelpGroupNextPrevControl");
+        public static string KeyHelpGroupJumpFirstLast => T("KeyHelpGroupJumpFirstLast");
+        public static string KeyHelpGroupScanThing => T("KeyHelpGroupScanThing");
+        public static string KeyHelpGroupScanCategory => T("KeyHelpGroupScanCategory");
+        public static string KeyHelpGroupScanPeople => T("KeyHelpGroupScanPeople");
+        public static string KeyHelpGroupScanItems => T("KeyHelpGroupScanItems");
+        public static string KeyHelpGroupScanExits => T("KeyHelpGroupScanExits");
 
         // Control role words, spoken after a control's label so the user knows what it is.
         public static string RoleButton => T("RoleButton");
@@ -932,6 +1021,7 @@ namespace DiscoAccess.Core.Strings
         public static string ScreenBeginPrompt => T("ScreenBeginPrompt");
         public static string ScreenModMenu => T("ScreenModMenu");
         public static string ScreenBookmarks => T("ScreenBookmarks");
+        public static string ScreenKeyHelp => T("ScreenKeyHelp");
 
         // Mod settings labels (the mod's own options, no game string to read).
         public static string SettingAutoReadDialogue => T("SettingAutoReadDialogue");

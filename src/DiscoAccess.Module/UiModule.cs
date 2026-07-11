@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DiscoAccess.Core.Input;
 using DiscoAccess.Core.Modularity;
 using DiscoAccess.Core.Strings;
@@ -72,9 +73,10 @@ namespace DiscoAccess.Module
         // Home/End/Backspace) binds no key Status binds, so it is unaffected.
         private static readonly InputCategory[] UiWithStatus = { InputCategory.Status, InputCategory.UI };
         private static readonly InputCategory[] WorldCategory = { InputCategory.World, InputCategory.Status };
-        // The global mod-menu and bookmarks hotkeys' action keys (internal ids, never spoken).
+        // The global mod-menu, bookmarks, and key-help hotkeys' action keys (internal ids, never spoken).
         private const string ModMenuAction = "mod.menu";
         private const string BookmarksAction = "mod.bookmarks";
+        private const string KeyHelpAction = "mod.help.keys";
         // The bookmarks file (BepInEx config folder), read fresh by the bookmarks menu on each query.
         private BookmarkStore _bookmarks;
         // The single source of truth for "a game text field owns the keyboard" (grace-inclusive). While
@@ -253,6 +255,13 @@ namespace DiscoAccess.Module
                 () => { if (!AnyTextEditActive) ToggleBookmarks(); })
                 .AddBinding(new KeyboardBinding(KeyCode.B, ctrl: true));
 
+            // Shift+F1 opens/closes the key-help screen, the same overlay pattern as F12 (bare F1 is the
+            // game's own help overlay, distinct by modifier). Global, so it answers "what can I press"
+            // in every context - the world, a menu, a dialogue.
+            _input.Register(KeyHelpAction, Strings.InputKeyHelp, InputCategory.Global,
+                () => { if (!AnyTextEditActive) ToggleKeyHelp(); })
+                .AddBinding(new KeyboardBinding(KeyCode.F1, shift: true));
+
             // The game's own trigger cycle between the info screens (character sheet, inventory, journal,
             // thought cabinet), re-provided as pad-only UI actions: the game's handler decides where the
             // cycle applies, exactly like Escape. Falls through the navigator (not a nav key) to fire here.
@@ -368,6 +377,44 @@ namespace DiscoAccess.Module
                 return;
             }
             _screens.ToggleOverlay(new BookmarksScreen(_bookmarks, _world));
+        }
+
+        // Toggle the key-help screen. The lines are composed HERE, at the keypress, because opening the
+        // overlay replaces the live key set with the overlay's own - this is the only moment the context
+        // the player is asking about is readable. (On a toggle-close the compose is discarded unused.)
+        // The direction fans and the next/previous pairs read as one line each; a group only collapses
+        // while every member is live, so a context that claims one of the keys (the heal arrows in a
+        // dialogue) lists the remaining members individually instead of promising all of them. The heal
+        // arrows and the 1/2 hand items look like pairs but are NOT grouped: their two keys act on
+        // different targets, and a collapsed line would lose which key does which.
+        private void ToggleKeyHelp()
+        {
+            var groups = new[]
+            {
+                new KeyHelpGroup(Strings.KeyHelpGroupNavigate, Strings.KeyHelpKeysArrows,
+                    new[] { UiActions.Up, UiActions.Down, UiActions.Left, UiActions.Right }),
+                new KeyHelpGroup(Strings.KeyHelpGroupNextPrevControl, null,
+                    new[] { UiActions.Next, UiActions.Prev }),
+                new KeyHelpGroup(Strings.KeyHelpGroupJumpFirstLast, null,
+                    new[] { UiActions.Home, UiActions.End }),
+                new KeyHelpGroup(Strings.KeyHelpGroupMoveCursor, Strings.KeyHelpKeysWasd,
+                    new[] { WorldActions.MoveNorth, WorldActions.MoveSouth, WorldActions.MoveEast, WorldActions.MoveWest }),
+                new KeyHelpGroup(Strings.KeyHelpGroupScanThing, null,
+                    new[] { WorldActions.ScanNext, WorldActions.ScanPrev }),
+                new KeyHelpGroup(Strings.KeyHelpGroupScanCategory, null,
+                    new[] { WorldActions.ScanNextCategory, WorldActions.ScanPrevCategory }),
+                new KeyHelpGroup(Strings.KeyHelpGroupScanPeople, null,
+                    new[] { WorldActions.ScanPeopleNext, WorldActions.ScanPeoplePrev }),
+                new KeyHelpGroup(Strings.KeyHelpGroupScanItems, null,
+                    new[] { WorldActions.ScanItemsNext, WorldActions.ScanItemsPrev }),
+                new KeyHelpGroup(Strings.KeyHelpGroupScanExits, null,
+                    new[] { WorldActions.ScanExitsNext, WorldActions.ScanExitsPrev }),
+            };
+            // The attached screen's own extra keys (the dialogue number jump) lead the list: they are the
+            // most context-specific lines, and the registry's snapshot cannot know them.
+            var lines = new List<string>(_screens.ScreenKeyHelpLines());
+            lines.AddRange(KeyHelp.Compose(_input.SnapshotLiveKeys(), groups));
+            _screens.ToggleOverlay(new KeyHelpScreen(lines));
         }
 
         // Route one UI action, shared by the live dispatcher and the dev seam so both honor the mod text

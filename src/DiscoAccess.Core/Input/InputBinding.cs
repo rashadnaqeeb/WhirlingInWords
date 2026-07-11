@@ -7,6 +7,10 @@ namespace DiscoAccess.Core.Input
     /// </summary>
     public abstract class InputBinding
     {
+        /// <summary>The <see cref="Type"/> tag of keyboard bindings, shared so the key-help snapshot can
+        /// select them without referencing the module's concrete binding.</summary>
+        public const string KeyboardType = "keyboard";
+
         /// <summary>Human-readable combo, e.g. "Ctrl+Shift+A".</summary>
         public abstract string DisplayName { get; }
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DiscoAccess.Core.Modularity;
 using DiscoAccess.Core.UI.Nav;
 using Sunshine.Views;
@@ -37,6 +38,11 @@ namespace DiscoAccess.Module.Nav
         /// Default false; the conversation view overrides this to true. Off for menus, where the heal arrows
         /// and bare letters serve navigation/type-ahead instead.</summary>
         public virtual bool WantsStatusKeys => false;
+
+        /// <summary>Extra key-help lines for keys this screen handles itself, outside the input registry
+        /// (the dialogue viewer's number-row jump), composed and ready to speak. The key-help screen
+        /// reads them ahead of the registry's own list. Empty by default.</summary>
+        public virtual IEnumerable<string> KeyHelpLines() => System.Array.Empty<string>();
 
         /// <summary>Called every frame while this screen stands (the view is unchanged). A rich screen
         /// overrides it to refresh dynamic content in place - rebuilding a sub-tree when the game state it

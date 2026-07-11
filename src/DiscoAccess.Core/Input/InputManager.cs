@@ -64,6 +64,34 @@ namespace DiscoAccess.Core.Input
             return false;
         }
 
+        /// <summary>The actions reachable from the keyboard right now, for the key-help screen: walk the
+        /// live categories in priority order and collect each action with at least one live (unshadowed)
+        /// keyboard binding, with those bindings' display names. Call it at the moment of the help
+        /// keypress - opening the help overlay itself changes the live set to the overlay's own keys, so
+        /// this must sample the context the player is asking about.</summary>
+        public List<KeyHelpEntry> SnapshotLiveKeys()
+        {
+            RebuildLive();
+            var entries = new List<KeyHelpEntry>();
+            for (int rank = 0; rank < _activeCats.Count; rank++)
+            {
+                for (int i = 0; i < _actions.Count; i++)
+                {
+                    var a = _actions[i];
+                    if (a.Category != _activeCats[rank]) continue;
+                    List<string>? chords = null;
+                    for (int j = 0; j < a.Bindings.Count; j++)
+                    {
+                        var b = a.Bindings[j];
+                        if (b.Type != InputBinding.KeyboardType || !_live.Contains(b)) continue;
+                        (chords ??= new List<string>()).Add(b.DisplayName);
+                    }
+                    if (chords != null) entries.Add(new KeyHelpEntry(a.Key, a.Label, chords));
+                }
+            }
+            return entries;
+        }
+
         // The frame's live state, rebuilt at the top of Tick (cheap: a handful of actions x ~1 binding).
         private readonly List<InputCategory> _activeCats = new List<InputCategory>();
         private readonly HashSet<InputBinding> _live = new HashSet<InputBinding>();

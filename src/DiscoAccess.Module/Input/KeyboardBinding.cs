@@ -47,7 +47,7 @@ namespace DiscoAccess.Module.Input
             }
         }
 
-        public override string Type => "keyboard";
+        public override string Type => KeyboardType;
 
         // "A|ctrl,shift" - the KeyCode, then a comma-list of held modifiers (omitted if none).
         public override string Serialize()

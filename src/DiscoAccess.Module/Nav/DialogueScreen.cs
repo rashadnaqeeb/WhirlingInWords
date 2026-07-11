@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DiscoAccess.Core.Modularity;
+using DiscoAccess.Core.Strings;
 using DiscoAccess.Core.Text;
 using DiscoAccess.Core.UI.Nav;
 using DiscoAccess.Module.Input; // DialogueChoiceInput
@@ -37,6 +38,13 @@ namespace DiscoAccess.Module.Nav
         // world status reads (t/m/h) and Left/Right quick-heals are wanted here (health can run out mid-talk).
         public override bool TypeAheadEnabled => false;
         public override bool WantsStatusKeys => true;
+
+        // The number-row jump below lives outside the input registry, so the key-help screen is told
+        // about it here.
+        public override IEnumerable<string> KeyHelpLines()
+        {
+            yield return Strings.KeyHelpLine(Strings.InputDialogueNumberJump, Strings.KeyHelpKeysDigits);
+        }
 
         private Container _root;
         private Container _flow;

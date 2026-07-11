@@ -90,6 +90,14 @@ namespace DiscoAccess.Module.Nav
         /// (default false when none).</summary>
         public bool StatusKeysActive => _attachedScreen?.WantsStatusKeys ?? false;
 
+        /// <summary>The attached screen's extra key-help lines (keys it handles outside the input
+        /// registry, e.g. the dialogue number jump). Empty while a mod overlay is what is driven - an
+        /// overlay's keys are all the registry's own.</summary>
+        public IEnumerable<string> ScreenKeyHelpLines()
+            => _overlay == null && _attachedScreen != null
+                ? _attachedScreen.KeyHelpLines()
+                : System.Array.Empty<string>();
+
         public ScreenManager(IModHost host)
         {
             _host = host;

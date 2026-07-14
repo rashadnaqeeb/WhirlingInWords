@@ -81,8 +81,10 @@ function Get-ChangelogSection {
     return $section
 }
 
-if ($VersionTag -notmatch '^v.+') {
-    Fail "Version tag must start with lowercase 'v', for example v1.0.0."
+# The installer finds the mod zip by the asset name pattern WhirlingInWords-v<maj>.<min>.<patch>.zip
+# and parses that version with semver, so only a strict three-part tag produces a release it can consume.
+if ($VersionTag -notmatch '^v\d+\.\d+\.\d+$') {
+    Fail "Version tag must be lowercase 'v' plus a three-part version, for example v1.0.0."
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

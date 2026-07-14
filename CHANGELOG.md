@@ -1,7 +1,8 @@
 # Changelog
 
-Release notes for Whirling in Words. create-release.ps1 reads the tagged
-version's section as the GitHub release notes.
+Release notes for Whirling in Words. Ongoing work is recorded under the Unreleased heading; the release skill retitles that section to the version being released, and create-release.ps1 reads the tagged version's section as the GitHub release notes.
+
+## Unreleased
 
 ## V1.0.0
 

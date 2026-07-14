@@ -4,9 +4,18 @@ Release notes for Whirling in Words. Ongoing work is recorded under the Unreleas
 
 ## Unreleased
 
+## V1.0.1
+
+New Features and improvements:
+
+- The installer accepts the Epic Games Store version of the game.
+- After an update, the installer log shows the release notes of the new versions.
+
 Bug fixes:
 
 - Fixed occasional dialogue freezes where every option stayed "not ready".
+- The installer now asks for administrator rights and handles read-only files, fixing failed installs under Program Files.
+- Durations combining hours and minutes now read correctly in languages other than English.
 
 ## V1.0.0
 

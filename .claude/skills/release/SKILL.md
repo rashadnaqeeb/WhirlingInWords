@@ -1,6 +1,6 @@
 ---
 name: release
-description: Cut and publish a mod release end to end - set the version, promote the changelog's Unreleased section, test, build the zip and installer, commit, tag, push, publish the GitHub release, verify it against the installer and update-check contract, delete the staged artifacts. Use when asked to release version X.Y.Z. Not for rebuilding artifacts without publishing - that is build_release.ps1 / build-installer.ps1 directly.
+description: Cut and publish a mod release end to end - set the version, promote the changelog's Unreleased section, test, build the zip and installer, commit, tag, push, publish the GitHub release, verify it against the installer and update-check contract, delete the staged artifacts, redeploy the Debug build to the local game. Use when asked to release version X.Y.Z. Not for rebuilding artifacts without publishing - that is build_release.ps1 / build-installer.ps1 directly.
 argument-hint: <version>
 ---
 
@@ -11,12 +11,12 @@ Publish the release whose version is given as the argument. The argument is a ba
 - The version must match `\d+\.\d+\.\d+` exactly. This is a hard contract, not a style rule: the installer identifies the mod zip asset by the name pattern `WhirlingInWords-v<maj>.<min>.<patch>.zip` and parses that version with the semver crate (`installer/src/core/github.rs`, `paths.rs`), and the mod's launch update check parses the release tag with `System.Version` (`src/WhirlingInWords.Core/Updates/UpdateCheck.cs`). A two-part or suffixed version publishes a release the installer cannot consume, and because the installer always reads `releases/latest`, that breaks every new install immediately, not just the new version.
 - The version must be strictly greater than the newest existing `v*` tag (semver order; no tags at all is fine). An equal or lower version makes the update check silently stop announcing to players on newer builds.
 - On `main`, working tree clean, `main` not behind `origin/main` (`git fetch origin` and compare), and `gh auth status` succeeds.
-- The game may stay running: everything here builds Release, which never deploys, so no game DLL is touched.
+- The game may stay running until the final Debug redeploy in Phase 5: everything else builds Release, which never deploys, so no game DLL is touched before then.
 
 ## Phase 1 - version and changelog
 
 - Set `<Version>` in `Directory.Build.props` to the target (skip the edit if already set). This is the single version source: `build_release.ps1` names the zip from it, and the same value is compiled into `BuildVersion.Value`, which is what the running mod compares against the release tag.
-- `CHANGELOG.md`: if a `## V<version>` section already exists with content, use it as is. Otherwise retitle the `## Unreleased` section to `## V<version>`. If there is no Unreleased content to promote, draft the section from `git log v<previous>..HEAD` in the existing changelog style - player-facing changes only, no internal refactor or tooling notes - and get the user's approval of the draft before continuing: this text becomes the published GitHub release notes verbatim.
+- `CHANGELOG.md`: if a `## V<version>` section already exists with content, use it as is. Otherwise retitle the `## Unreleased` section to `## V<version>`. The retitle is the only changelog edit that never needs approval; every change to entry text does. Check `git log v<previous>..HEAD` for player-facing changes the section is missing, but never add, reword, delete, or draft entries without showing the user the exact proposed text and getting their approval first: this text becomes the published GitHub release notes verbatim.
 - Leave a fresh empty `## Unreleased` heading at the top so future work has its standing slot.
 - The heading format is `## V<version>` with a capital V. `create-release.ps1` extracts the notes by finding exactly that heading and fails on a missing or empty section.
 
@@ -41,6 +41,7 @@ Publish the release whose version is given as the argument. The argument is a ba
 
 - Read back `gh api repos/rashadnaqeeb/WhirlingInWords/releases/latest` and confirm both consumer contracts on the real thing: `tag_name` is `v<version>` (what the update check announces from), and the assets are `WhirlingInWords-v<version>.zip` (what the installer's name pattern must match) and `WhirlingInWordsInstaller.exe`.
 - Delete `releases\WhirlingInWords-v<version>.zip` and `releases\WhirlingInWordsInstaller.exe`. `create-release.ps1` only checks that the files exist, so an artifact left behind can be republished stale by a future run that skipped a build.
+- Finish with `dotnet build WhirlingInWords.slnx -c Debug` so the deployed local game build carries the released version (only Debug deploys, so until this runs the game still loads the pre-bump build and its update check compares against the wrong version). If the running game holds the DLLs locked and the deploy is skipped (`MSB3021`), carry the cycle per CLAUDE.md: close the game, rebuild, relaunch through Steam.
 
 ## Failure and re-run notes
 

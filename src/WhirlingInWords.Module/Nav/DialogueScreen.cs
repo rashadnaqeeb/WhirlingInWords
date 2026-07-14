@@ -63,6 +63,10 @@ namespace WhirlingInWords.Module.Nav
         // The player line we last auto-advanced past, so a player line the game holds for a continue is
         // advanced exactly once (not re-fired each frame until the state settles, which would skip a line).
         private string _autoContinuedLine;
+        // When the stranded-sequencer state was first seen this stretch, or -1 while healthy. The state
+        // must persist before we recover: a line start briefly raises the lock before its sequence begins.
+        private float _wedgeSince = -1f;
+        private const float WedgeConfirmSeconds = 0.5f;
 
         public override Container BuildRoot(IModHost host)
         {
@@ -81,6 +85,25 @@ namespace WhirlingInWords.Module.Nav
         public override bool OnUpdate(IModHost host, TraditionalNavigator nav)
         {
             _host = host;
+            // A continue sent mid-sequence (our continue path can, the on-screen button cannot) makes the
+            // game kill the sequence commands its lock is counting, so the lock never clears and every
+            // response select refuses from then on. Fire the game's own recovery once the stranded state
+            // (lock up, sequencer idle) outlives a legitimate line start.
+            if (DialogueAdapter.SequencerWedged())
+            {
+                float now = UnityEngine.Time.unscaledTime;
+                if (_wedgeSince < 0f)
+                    _wedgeSince = now;
+                else if (now - _wedgeSince >= WedgeConfirmSeconds)
+                {
+                    host.LogWarning("DialogueScreen: sequencer lock stranded (lock up, sequencer idle); "
+                        + "firing the game's EmergencyForceDeblock");
+                    DialogueAdapter.RecoverWedgedSequencer();
+                    _wedgeSince = -1f;
+                }
+            }
+            else
+                _wedgeSince = -1f;
             // A player line the game is holding for a continue is the player's own choice echoed as a
             // subtitle (we do not read it back); advancing it manually has no payoff and stalls the reader
             // silently, so auto-advance past it to the line that follows. Fire once per such line, and only
@@ -88,13 +111,14 @@ namespace WhirlingInWords.Module.Nav
             // advancing, spending our single continue without moving on and wedging the conversation.
             Subtitle sub = DialogueAdapter.State()?.subtitle;
             if (sub != null && sub.speakerInfo != null && sub.speakerInfo.isPlayer
-                && DialogueAdapter.ContinueAvailable() && !DialogueAdapter.SequencePlaying())
+                && DialogueAdapter.ContinueAvailable() && !DialogueAdapter.SequencePlaying()
+                && DialogueAdapter.ContinueOnScreen())
             {
                 string playerLine = sub.formattedText != null ? sub.formattedText.text : null;
                 if (playerLine != _autoContinuedLine)
                 {
                     _autoContinuedLine = playerLine;
-                    DialogueAdapter.Continue();
+                    DialogueAdapter.Continue(host);
                     return false;
                 }
             }
@@ -160,7 +184,7 @@ namespace WhirlingInWords.Module.Nav
                     && (fe.checkResult.HasRoll() || fe.checkResult.checkType == Sunshine.Metric.CheckType.PASSIVE))
                     _flow.Add(new DialogueCheckRollCell(fe.checkResult));
                 var cell = last
-                    ? new DialogueLineCell(entries[i], DialogueAdapter.ContinueAvailable, DialogueAdapter.Continue)
+                    ? new DialogueLineCell(entries[i], DialogueAdapter.ContinueAvailable, () => DialogueAdapter.Continue(_host))
                     : new DialogueLineCell(entries[i]);
                 _flow.Add(cell);
                 if (last)
@@ -186,7 +210,7 @@ namespace WhirlingInWords.Module.Nav
             // It is choice 1 for the number-row jump in this continue-only state.
             if (responseCount == 0 && DialogueAdapter.ContinueAvailable())
             {
-                var continueCell = new DialogueContinueCell(DialogueAdapter.ContinueAvailable, DialogueAdapter.Continue);
+                var continueCell = new DialogueContinueCell(DialogueAdapter.ContinueAvailable, () => DialogueAdapter.Continue(_host));
                 _flow.Add(continueCell);
                 _choices.Add(continueCell);
             }

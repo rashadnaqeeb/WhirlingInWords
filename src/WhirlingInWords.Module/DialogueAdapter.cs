@@ -63,9 +63,30 @@ namespace WhirlingInWords.Module
             return cb != null && cb.State != ContState.DISABLED;
         }
 
+        /// <summary>Whether the game is showing its continue button right now. The game guards the
+        /// button with layout alone - while a line's sequence plays the button is stashed off screen,
+        /// but its click handler still runs if invoked - so pressing must be allowed exactly while a
+        /// mouse click is physically possible.</summary>
+        public static bool ContinueOnScreen()
+        {
+            ContinueResponseToggle toggle = ContinueResponseToggle.Singleton;
+            return toggle != null && toggle.State == InteractionState.CONTINUE;
+        }
+
         /// <summary>Advance the conversation through the game's own continue handler (plays its sound and
-        /// runs the same path the on-screen continue button would).</summary>
-        public static void Continue() => Logger()?.continueButton?.WasClicked();
+        /// runs the same path the on-screen continue button would). Refused, spoken, while the game hides
+        /// the button: a continue invoked then fast-forwards the line, killing sequence commands whose
+        /// lost finish reports strand the response-menu lock (see <see cref="SequencerWedged"/>).</summary>
+        public static void Continue(IModHost host)
+        {
+            if (!ContinueOnScreen())
+            {
+                host?.LogInfo("DialogueAdapter: continue refused, the game's continue button is hidden");
+                host?.Speech.Speak(Strings.DialogueNotReady, interrupt: true);
+                return;
+            }
+            Logger()?.continueButton?.WasClicked();
+        }
 
         /// <summary>Whether the current line's sequence is still playing. A continue sent while the
         /// sequence runs fast-forwards the line (the game's continue handler calls Sequencer.Stop)
@@ -77,6 +98,21 @@ namespace WhirlingInWords.Module
             Sequencer seq = view != null ? view.sequencer : null;
             return seq != null && seq.IsPlaying;
         }
+
+        /// <summary>Whether the game's sequencer lock is stranded: the lock is up (a line's sequence
+        /// commands have not all reported finished) but the sequencer is idle, so no report is coming.
+        /// The game's fast-forward (a continue sent while the sequence plays) destroys the running
+        /// commands without reporting them. <see cref="Continue"/> refuses that press, but a stranded
+        /// lock from any other source keeps the response menu and continue hidden for the rest of the
+        /// session - nothing in the game clears it, so the dialogue screen watches for this and
+        /// recovers.</summary>
+        public static bool SequencerWedged() =>
+            ContinueResponseToggle.SequencerLock && !SequencePlaying();
+
+        /// <summary>Clear a stranded sequencer lock through the game's own (otherwise unused) recovery,
+        /// which replays the last finish report: the lock drops, the response menu or continue button
+        /// unhides, and the game-wide input lock is released.</summary>
+        public static void RecoverWedgedSequencer() => SequenceCommander.EmergencyForceDeblock();
 
         /// <summary>The on-screen button rendering a response, matched by its destination entry (two
         /// interop proxies of one response are not reference-equal), or null when none is on screen.</summary>
@@ -125,6 +161,7 @@ namespace WhirlingInWords.Module
             // the menu, spoken so the early press is never a silent dead key.
             if (ContinueResponseToggle.SequencerLock)
             {
+                host?.LogInfo("DialogueAdapter: response refused, sequencer lock is up");
                 host?.Speech.Speak(Strings.DialogueNotReady, interrupt: true);
                 return;
             }
@@ -138,6 +175,7 @@ namespace WhirlingInWords.Module
                 // response.enabled) still run inside the invoke.
                 if (!b.button.IsInteractable())
                 {
+                    host?.LogInfo("DialogueAdapter: response refused, button not interactable");
                     host?.Speech.Speak(Strings.DialogueNotReady, interrupt: true);
                     return;
                 }

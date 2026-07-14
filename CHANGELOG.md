@@ -4,6 +4,10 @@ Release notes for Whirling in Words. Ongoing work is recorded under the Unreleas
 
 ## Unreleased
 
+Bug fixes:
+
+- Fixed occasional dialogue freezes where every option stayed "not ready".
+
 ## V1.0.0
 
 First release: full screen-reader access to Disco Elysium - The Final Cut.

@@ -4,6 +4,10 @@ Release notes for Non-Visual Calculus. Ongoing work is recorded under the Unrele
 
 ## Unreleased
 
+New Features and improvements:
+
+- Improved the mod's ability to identify doors: doors that shared one generic name now each speak a distinct one.
+
 ## V1.1.3
 
 Bug fixes:

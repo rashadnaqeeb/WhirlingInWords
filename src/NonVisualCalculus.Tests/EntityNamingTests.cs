@@ -7,8 +7,9 @@ namespace NonVisualCalculus.Tests
     public class EntityNamingTests
     {
         private static string Resolve(string? name, string? authored = null, string? title = null, bool named = false,
-                                      string cat = WorldTaxonomy.Container, IReadOnlyCollection<string>? area = null)
-            => EntityNaming.Resolve(name, authored, title, named, cat, area);
+                                      string cat = WorldTaxonomy.Container, IReadOnlyCollection<string>? area = null,
+                                      string? doorActor = null)
+            => EntityNaming.Resolve(name, authored, title, named, cat, area, authoredDoorName: doorActor);
 
         [Fact]
         public void AuthoredConversant_IsPreferredForProps()
@@ -55,7 +56,7 @@ namespace NonVisualCalculus.Tests
             // read from the GameObject.name: "Whirling-in-Rags" through a "...-door-..." reads "Whirling in
             // Rags door".
             Assert.Equal("Whirling in Rags door",
-                Resolve("waterfront-door-rooftop", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
+                Resolve("waterfront-door-whirling", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
             Assert.Equal("Cuno's shack door",
                 Resolve("courtyard-door-cunos-shack", authored: "Cuno's shack", cat: WorldTaxonomy.Exit));
             // No portal word in the name falls back to the generic "exit": the tent flap's name is just "tent".
@@ -93,6 +94,13 @@ namespace NonVisualCalculus.Tests
                 EntityNaming.ExitDestinationLabel("Union-boss-int", "Harbour", "Martinaise"));
             Assert.Equal("cargo container",
                 EntityNaming.ExitDestinationLabel("Union-container-int", "Harbour", "Martinaise"));
+            // The coal room under the Capeside tenements is authored likewise: the game labels it
+            // "Capeside apartments" like the rest of the building.
+            Assert.Equal("coal room",
+                EntityNaming.ExitDestinationLabel("Capeside-coalchamber-int", "Capeside apartments", "Martinaise"));
+            // The net picker's house shares its "Fishing village" label with another hut.
+            Assert.Equal("net picker's house",
+                EntityNaming.ExitDestinationLabel("FV-house-int", "Fishing village", "Martinaise"));
         }
 
         [Fact]
@@ -174,6 +182,70 @@ namespace NonVisualCalculus.Tests
             // An authored examine header still beats the table.
             Assert.Equal("Door, Room #1",
                 Resolve("Whirling Door Bathroom Kitsuragi", authored: "Door, Room #1", cat: WorldTaxonomy.Door));
+        }
+
+        [Fact]
+        public void Exit_GameNamedDoor_SpeaksTheActorNameComplete()
+        {
+            // A door the game names through a curated dialogue actor speaks that name as-is: neither
+            // composed with the shared destination label ("Capeside apartments door" nine times over)
+            // nor with a type word appended ("...#28 door").
+            Assert.Equal("Door, Apartment #28",
+                Resolve("courtyard-door-apartments-28", authored: "Capeside apartments",
+                        doorActor: "Door, Apartment #28", cat: WorldTaxonomy.Exit));
+            Assert.Equal("Southwest Entrance to the Tenements",
+                Resolve("pier-door-apartments-1", authored: "Capeside apartments",
+                        doorActor: "Southwest Entrance to the Tenements", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void Exit_AuthoredFallback_NamesTheTenementStairwellDoors()
+        {
+            // The tenement stairwell's entrances share one destination label ("Capeside apartments"),
+            // so the fallback beats the destination, naming each for the side of the building it is on.
+            Assert.Equal("courtyard tenement door",
+                Resolve("courtyard-door-apartments-floor-1", authored: "Capeside apartments", cat: WorldTaxonomy.Exit));
+            Assert.Equal("upper courtyard tenement door",
+                Resolve("courtyard-door-apartments-floor-2", authored: "Capeside apartments", cat: WorldTaxonomy.Exit));
+            Assert.Equal("upper pier tenement door",
+                Resolve("pier-door-apartments-2", authored: "Capeside apartments", cat: WorldTaxonomy.Exit));
+            // And from inside, all four exits lead to "Martinaise": each named for where it lands.
+            Assert.Equal("courtyard door",
+                Resolve("apartments-door-courtyard-1", authored: "Martinaise", cat: WorldTaxonomy.Exit));
+            Assert.Equal("upper courtyard door",
+                Resolve("apartments-door-courtyard-2", authored: "Martinaise", cat: WorldTaxonomy.Exit));
+            Assert.Equal("pier door",
+                Resolve("apartments-door-pier-1", authored: "Martinaise", cat: WorldTaxonomy.Exit));
+            Assert.Equal("upper pier door",
+                Resolve("apartments-door-pier-2", authored: "Martinaise", cat: WorldTaxonomy.Exit));
+        }
+
+        [Fact]
+        public void Door_Apartment10OpenVariant_NamedByFallback()
+        {
+            // The open-state door object has no conversation; its raw dev name would otherwise speak.
+            Assert.Equal("apartment 10 door", Resolve("Door Apartment 10 Open", cat: WorldTaxonomy.Door));
+        }
+
+        [Fact]
+        public void Exit_AuthoredFallback_NamesTheWhirlingUpperDoorsAndFortressOpenings()
+        {
+            // The Whirling's upper doors would all read the shared destination ("Whirling-in-Rags
+            // door" four times over); the balcony and roof doors are named for where they stand.
+            Assert.Equal("balcony door",
+                Resolve("waterfront-door-balcony", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
+            Assert.Equal("roof door",
+                Resolve("waterfront-door-klaasje_roof", authored: "Whirling-in-Rags", cat: WorldTaxonomy.Exit));
+            // The sea fortress ruin's three openings all lead into its one interior.
+            Assert.Equal("main fortress door",
+                Resolve("fortress-door-main", authored: "Sea Fortress", cat: WorldTaxonomy.Exit));
+            Assert.Equal("east fortress door",
+                Resolve("fortress-door-east", authored: "Sea Fortress", cat: WorldTaxonomy.Exit));
+            Assert.Equal("fortress hole",
+                Resolve("fortress-door-hole", authored: "Sea Fortress", cat: WorldTaxonomy.Exit));
+            // The fishing village's shack shares its destination label with the net picker's house.
+            Assert.Equal("shack door",
+                Resolve("fv-door-shack", authored: "Fishing village", cat: WorldTaxonomy.Exit));
         }
 
         [Fact]

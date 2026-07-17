@@ -17,11 +17,15 @@ namespace NonVisualCalculus.Core.World
     ///
     /// - A named character prefers the authored name (which drops a location prefix, "Yard Cuno" to "Cuno");
     ///   else a clean <c>GameObject.name</c>; else "person", never a raw conversation title (which would leak).
-    /// - An exit prefers its authored name too, which the proxy resolves as the localized DESTINATION it leads
-    ///   to ("Whirling-in-Rags", "Cuno's shack"), so the player hears where a door goes; else its clean name,
-    ///   else the category word "exit". A plain door prefers its authored examine header ("Door, Room #1"),
-    ///   then the mod's authored name for the known dev-named doors (the fallback table, shared with locked
-    ///   exit-doors that lead nowhere), then its own clean name, else "door".
+    /// - An exit speaks a COMPLETE door name first when one exists: the game's own name for that specific
+    ///   door (a curated dialogue actor the proxy resolves, "Door, Apartment #28" - see
+    ///   <paramref name="authoredDoorName"/>), else the mod's from the door fallback table. Both cover doors
+    ///   whose destination label is shared by a whole building ("Capeside apartments"), where destination
+    ///   naming would read alike for every one. Otherwise it prefers its authored name, which the proxy
+    ///   resolves as the localized DESTINATION it leads to ("Whirling-in-Rags", "Cuno's shack"), so the
+    ///   player hears where a door goes; else its clean name, else the category word "exit". A plain door
+    ///   prefers its authored examine header ("Door, Room #1"), then the mod's authored name for the known
+    ///   dev-named doors (the fallback table, shared with exit-doors), then its own clean name, else "door".
     /// - A container prefers the authored name; failing that it is named from the <c>GameObject.name</c> by
     ///   its object TYPE when a generic container word is present ("box", "crate", "money", "trash can"),
     ///   position-independent so the designer's word order and location decoration stop mattering ("Box
@@ -44,7 +48,8 @@ namespace NonVisualCalculus.Core.World
         public static string Resolve(string? rawName, string? authoredName, string? conversationTitle,
                                      bool isNamedCharacter, string category,
                                      IReadOnlyCollection<string>? areaTokens = null,
-                                     string? contentName = null)
+                                     string? contentName = null,
+                                     string? authoredDoorName = null)
         {
             string name = Normalize(rawName);
             string? authored = CleanAuthored(authoredName);
@@ -62,18 +67,20 @@ namespace NonVisualCalculus.Core.World
                        ?? AuthoredDoorFallback(name)
                        ?? (name.Length > 0 && !IsSlug(name) ? name : TypeWord(category));
 
-            // An exit: the destination it leads to when the proxy resolved one, plus the portal type read from
-            // the GameObject.name ("courtyard-door-..." to "door", "...stairs..." to "stairs"), so the player
-            // hears "Whirling in Rags door" or "floor 2 stairs". With no resolved destination but a door named
-            // for a specific outdoor spot ("Balcony", "Roof" - see SpotFromDoorName, set up by the proxy for
-            // exterior doors), that spot leads, defaulting to "door" ("balcony door"). Failing both, a clean
-            // bespoke name, else the plain type word.
+            // An exit: a complete door name first - the game's authored name for this specific door
+            // (a curated dialogue actor the proxy resolved) or the mod's from the fallback table, both
+            // spoken as-is. Else the destination it leads to when the proxy resolved one, plus the portal
+            // type read from the GameObject.name ("courtyard-door-..." to "door", "...stairs..." to
+            // "stairs"), so the player hears "Whirling in Rags door" or "floor 2 stairs". With no resolved
+            // destination but a door named for a specific outdoor spot ("Balcony", "Roof" - see
+            // SpotFromDoorName, set up by the proxy for exterior doors), that spot leads, defaulting to
+            // "door" ("balcony door"). Failing both, a clean bespoke name, else the plain type word.
             if (category == WorldTaxonomy.Exit)
             {
+                string? complete = CleanAuthored(authoredDoorName) ?? AuthoredDoorFallback(name);
+                if (complete != null) return complete;
                 string? typeKw = ExitTypeKeyword(name);
                 if (authored != null) return ExitNamed(authored, typeKw ?? WorldThingExit);
-                string? fallback = AuthoredDoorFallback(name);
-                if (fallback != null) return fallback;
                 string? spot = SpotFromDoorName(name);
                 if (spot != null) return ExitNamed(spot, typeKw ?? WorldThingDoor);
                 return name.Length > 0 && !IsSlug(name) ? name : (typeKw ?? WorldThingExit);
@@ -250,28 +257,58 @@ namespace NonVisualCalculus.Core.World
         }
 
         // The mod's own authored names for specific doors, keyed by the normalized GameObject.name. Only for
-        // doors the game gives NEITHER an examine actor NOR a readable object name: the Whirling floor-2
-        // bathroom doors and the Capeside locked doors are raw dev names that leak cast names ("Whirling
-        // Door Bathroom Klaasje") or reduce to a bare "door" among many. Values come from the Strings table
-        // so they localize with the rest of the authored set; a door with any game string keeps it (the
-        // authored examine header is checked first).
-        private static readonly Dictionary<string, string> AuthoredDoorFallbacks =
-            new Dictionary<string, string>(StringComparer.Ordinal)
+        // doors the game gives NEITHER an examine actor NOR a readable object name: raw dev names that leak
+        // cast names ("Whirling Door Bathroom Klaasje"), reduce to a bare "door" among many, or - for the
+        // Capeside tenement stairwell's exits - share one destination label with the whole building, so the
+        // destination naming an exit normally gets reads alike for every one. Values are Strings-table
+        // lookups, resolved per call so a runtime language switch is honoured; a door with any game string
+        // keeps it (the authored examine header, or for an exit the curated door actor, is checked first).
+        private static readonly Dictionary<string, Func<string>> AuthoredDoorFallbacks =
+            new Dictionary<string, Func<string>>(StringComparer.Ordinal)
         {
             // Kitsuragi's is the door joining the shared bathroom to his room - spoken as the connection
             // it is, so the bathroom's two doors are distinguishable by ear.
-            ["Whirling Door Bathroom Kitsuragi"] = WorldThingConnectingDoor,
-            ["Whirling Door Bathroom Klaasje"] = WorldThingBathroomDoor,
-            ["Door Apartment no dialogue(bathroom)"] = WorldThingBathroomDoor,
-            ["Door Apartment no dialogue(empty room)"] = WorldThingLockedDoor,
-            ["Door Apartment 10 Locked"] = WorldThingLockedDoor,
-            ["Locked-door_capeside-1"] = WorldThingLockedDoor,
-            ["Locked-door_capeside-2"] = WorldThingLockedDoor,
-            ["Locked-door_capeside-3"] = WorldThingLockedDoor,
+            ["Whirling Door Bathroom Kitsuragi"] = () => WorldThingConnectingDoor,
+            ["Whirling Door Bathroom Klaasje"] = () => WorldThingBathroomDoor,
+            ["Door Apartment no dialogue(bathroom)"] = () => WorldThingBathroomDoor,
+            ["Door Apartment no dialogue(empty room)"] = () => WorldThingLockedDoor,
+            ["Door Apartment 10 Locked"] = () => WorldThingLockedDoor,
+            ["Locked-door_capeside-1"] = () => WorldThingLockedDoor,
+            ["Locked-door_capeside-2"] = () => WorldThingLockedDoor,
+            ["Locked-door_capeside-3"] = () => WorldThingLockedDoor,
+            // Apartment #10's open-state door object carries no conversation (the padlocked variant
+            // speaks the game's "Padlocked Door" actor).
+            ["Door Apartment 10 Open"] = () => WorldThingApartment10Door,
+            // The Capeside tenement stairwell's street entrances, named for the side of the building
+            // each pierces - every destination behind the building is labeled "Capeside apartments".
+            // The pier-level entrance is absent deliberately: the game names that one itself ("Southwest
+            // Entrance to the Tenements", a door actor the proxy resolves).
+            ["courtyard-door-apartments-floor-1"] = () => WorldThingCourtyardTenementDoor,
+            ["courtyard-door-apartments-floor-2"] = () => WorldThingUpperCourtyardTenementDoor,
+            ["pier-door-apartments-2"] = () => WorldThingUpperPierTenementDoor,
+            // And its exits seen from inside, all leading to the one exterior area ("Martinaise"):
+            // named for where on the street each lands.
+            ["apartments-door-courtyard-1"] = () => WorldThingCourtyardDoor,
+            ["apartments-door-courtyard-2"] = () => WorldThingUpperCourtyardDoor,
+            ["apartments-door-pier-1"] = () => WorldThingPierDoor,
+            ["apartments-door-pier-2"] = () => WorldThingUpperPierDoor,
+            // The Whirling-in-Rags' dev-named upper doors, which its destination label would read
+            // alike ("Whirling-in-Rags door" four times over; the antechamber door speaks the
+            // game's "Barred Door" actor instead - see the module's exit-door actors, and the
+            // front door keeps the destination).
+            ["waterfront-door-balcony"] = () => WorldThingBalconyDoor,
+            ["waterfront-door-klaasje_roof"] = () => WorldThingRoofDoor,
+            // The sea fortress ruin's three openings into its one interior.
+            ["fortress-door-main"] = () => WorldThingFortressMainDoor,
+            ["fortress-door-east"] = () => WorldThingFortressEastDoor,
+            ["fortress-door-hole"] = () => WorldThingFortressHole,
+            // The fishing village's shack, whose destination label is the shared "Fishing
+            // village" (the village's other door reads the net picker's house).
+            ["fv-door-shack"] = () => WorldThingShackDoor,
         };
 
         private static string? AuthoredDoorFallback(string normalizedName)
-            => AuthoredDoorFallbacks.TryGetValue(normalizedName, out string? spoken) ? spoken : null;
+            => AuthoredDoorFallbacks.TryGetValue(normalizedName, out Func<string>? spoken) ? spoken() : null;
 
         // The game's authored display name (a conversant actor, or an exit's destination area), rejected only
         // when unusable: empty, a machine id (an underscore), the player ("You"/"Player"), or a
@@ -407,9 +444,10 @@ namespace NonVisualCalculus.Core.World
 
         // The mod's authored name for a destination whose game area label misnames the place: the
         // secretary's office, the union boss's office, and the container yard's cargo container are
-        // all localized "Harbour" (the only three areas that are), so the game's labels cannot tell
-        // those doors from a harbour gate or from each other. Resolved per call so a runtime
-        // language switch is honoured.
+        // all localized "Harbour", and the coal room under the Capeside tenements is localized
+        // "Capeside apartments", so the game's labels cannot tell those doors from a harbour gate,
+        // an apartment door, or each other. Resolved per call so a runtime language switch is
+        // honoured.
         private static string? AuthoredAreaName(string? destAreaId)
         {
             if (string.Equals(destAreaId, "Secretary-int", StringComparison.OrdinalIgnoreCase))
@@ -418,6 +456,10 @@ namespace NonVisualCalculus.Core.World
                 return WorldPlaceUnionOffice;
             if (string.Equals(destAreaId, "Union-container-int", StringComparison.OrdinalIgnoreCase))
                 return WorldPlaceCargoContainer;
+            if (string.Equals(destAreaId, "Capeside-coalchamber-int", StringComparison.OrdinalIgnoreCase))
+                return WorldPlaceCoalRoom;
+            if (string.Equals(destAreaId, "FV-house-int", StringComparison.OrdinalIgnoreCase))
+                return WorldPlaceNetPickersHouse;
             return null;
         }
 

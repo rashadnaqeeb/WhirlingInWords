@@ -41,9 +41,11 @@ namespace NonVisualCalculus.Module.World
         // thing (see AuthoredName): the destination area for an exit, else the actor that voices its examine
         // description. Core combines it with GameObject.name fallbacks (and, for a flavor-named container,
         // the localized name of its single visible item - see ContentItemName). A Character is treated as a
-        // named thing so a title is never spoken in its place.
+        // named thing so a title is never spoken in its place. An exit-door the game names outright passes
+        // that complete name besides (see ExitDoorActorName), which Core speaks as-is.
         public string Name => EntityNaming.Resolve(_e.name, AuthoredName(), _e.conversation,
-            _e.TryCast<Character>() != null, Category, SceneAreaTokens(), ContentItemName());
+            _e.TryCast<Character>() != null, Category, SceneAreaTokens(), ContentItemName(),
+            ExitDoorActorName());
 
         // The localized display name of a container's single guaranteed item, or null. Core speaks it only
         // for a flavor-named container - the loot lying visibly in the world (the trousers on the chair) -
@@ -241,6 +243,35 @@ namespace NonVisualCalculus.Module.World
         {
             ["Whirling Door Klaasje"] = "Door, Room #3",
         };
+
+        // The game's complete name for specific exterior door-exits, keyed by GameObject.name: each leads
+        // behind the Capeside tenements' shared area label ("Capeside apartments" covers seven interiors),
+        // so the destination naming an exit normally gets cannot tell them apart - but each door's examine
+        // conversation carries a door ACTOR whose localized name is exactly the header a sighted player
+        // reads. Curated like ExamineActorOverrides, so the name still comes from the game's own localized
+        // actor table; Core speaks it as-is, never composed with a type word.
+        private static readonly System.Collections.Generic.Dictionary<string, string> ExitDoorActors =
+            new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["courtyard-door-apartments-wcw"] = "Door, Apartment #20",
+            ["courtyard-door-apartments-28"] = "Door, Apartment #28",
+            // A second door object for the same apartment's doorway.
+            ["courtyard-door-smoker"] = "Door, Apartment #28",
+            ["pier-door-commustudent"] = "Metal Grille Door",
+            ["pier-door-apartments-1"] = "Southwest Entrance to the Tenements",
+            // The Whirling floor-3 antechamber's door, one of four exterior doors that would all
+            // read the shared "Whirling-in-Rags" destination.
+            ["waterfront-door-rooftop"] = "Barred Door",
+        };
+
+        // The localized name of the curated door actor naming this exit, or null for every other entity.
+        private string ExitDoorActorName()
+        {
+            if (!ExitDoorActors.TryGetValue(_e.name, out string actorName)) return null;
+            DialogueDatabase db = DialogueManager.masterDatabase;
+            Actor door = db?.GetActor(actorName);
+            return door == null ? null : LocalizationUtils.GetActorLocalizedField(door, "Name");
+        }
 
         // A person in the dialogue data: the player, or an actor the game marks IsNPC (people carry it,
         // object-actors lack it; the talking Kineema is marked IsNPC but never reaches the checks that

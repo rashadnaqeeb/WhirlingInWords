@@ -561,6 +561,41 @@ namespace NonVisualCalculus.Core.Strings
             // Locked, not merely shut: StatusOpen is the spoken contrast, so a word that also reads
             // as "closed" tells the player nothing. Reuse the game's own I2 TOOLTIP_LOCKED word.
             D("WorldThingLockedDoor", "locked door"),
+            // The Capeside tenement stairwell's street entrances, named for the side of the building
+            // each pierces: the game gives every destination behind the building one label ("Capeside
+            // apartments"), so nine doors would read alike. "Tenement" is the game's own word for the
+            // building (its named entrance is the "Southwest Entrance to the Tenements", which keeps
+            // its game name and is not in this set). Complete door names, spoken as-is.
+            D("WorldThingCourtyardTenementDoor", "courtyard tenement door"),
+            D("WorldThingUpperCourtyardTenementDoor", "upper courtyard tenement door"),
+            D("WorldThingUpperPierTenementDoor", "upper pier tenement door"),
+            // The same stairwell's exits seen from inside: all four lead to the one exterior area
+            // ("Martinaise"), so each is named for where on the street it lands. Complete door names.
+            D("WorldThingCourtyardDoor", "courtyard door"),
+            D("WorldThingUpperCourtyardDoor", "upper courtyard door"),
+            D("WorldThingPierDoor", "pier door"),
+            D("WorldThingUpperPierDoor", "upper pier door"),
+            // Apartment #10's door once its padlock is open: the open state is a separate door object
+            // with no conversation (the padlocked one speaks the game's "Padlocked Door" actor), and
+            // its raw dev name would otherwise leak. Complete door name.
+            D("WorldThingApartment10Door", "apartment 10 door"),
+            // The Whirling-in-Rags' upper entrances, which the game names nowhere: the floor-2
+            // balcony door and the roof door down into floor 3. The building's other two exterior
+            // doors read the game's own names (the front door its destination, the antechamber
+            // door its "Barred Door" actor). Complete door names.
+            D("WorldThingBalconyDoor", "balcony door"),
+            D("WorldThingRoofDoor", "roof door"),
+            // The sea fortress ruin's three openings, all into its one interior, so the destination
+            // label reads alike for all three: the main doorway (the game's examine notes warm air
+            // from inside), the east doorway, and the opening the developers name "hole". The
+            // fortress word matches the game's area name ("Sea Fortress"). Complete names.
+            D("WorldThingFortressMainDoor", "main fortress door"),
+            D("WorldThingFortressEastDoor", "east fortress door"),
+            D("WorldThingFortressHole", "fortress hole"),
+            // The fishing village's unnamed shack. The wording follows the game's own "Shack
+            // Door" actor (authored for the second home's door, whose exit reads its distinct
+            // destination instead), so each translation reuses the game's word for the hut.
+            D("WorldThingShackDoor", "shack door"),
             // Authored destination name for the harbour secretary's office: the game's own area
             // label for that interior is just "Harbour", the same word the actual harbour speaks,
             // so a door into the office would be indistinguishable by ear from a harbour gate.
@@ -579,6 +614,15 @@ namespace NonVisualCalculus.Core.Strings
             // phrase, which a translation must not take instead. Its owner is a discovery, so no name
             // that reveals one. Noun phrase.
             D("WorldPlaceCargoContainer", "cargo container"),
+            // The same for the coal room under the Capeside tenements (Capeside-coalchamber-int),
+            // whose game area label is "Capeside apartments" like the rest of the building. Noun
+            // phrase; fills WorldExitNamed ("coal room door").
+            D("WorldPlaceCoalRoom", "coal room"),
+            // The same for the net picker's house (FV-house-int), whose game area label is the
+            // shared "Fishing village". "Net picker" is the game's own title for Lilienne, who
+            // lives there - a WOMAN, so a gendered language builds this on a feminine noun. Noun
+            // phrase; fills WorldExitNamed ("net picker's house door").
+            D("WorldPlaceNetPickersHouse", "net picker's house"),
             // An exit named for where it goes: {0} = the destination name, {1} = the portal type word
             // ("Whirling in Rags door", "floor 2 stairs"); order the two as the language wants.
             D("WorldExitNamed", "{0} {1}"),
@@ -1267,6 +1311,23 @@ namespace NonVisualCalculus.Core.Strings
         public static string WorldThingBathroomDoor => T("WorldThingBathroomDoor");
         public static string WorldThingConnectingDoor => T("WorldThingConnectingDoor");
         public static string WorldThingLockedDoor => T("WorldThingLockedDoor");
+        // The Capeside tenement stairwell's entrances (outside) and its exits back out (inside),
+        // named for the side of the building each opens on; and apartment #10's open-state door.
+        public static string WorldThingCourtyardTenementDoor => T("WorldThingCourtyardTenementDoor");
+        public static string WorldThingUpperCourtyardTenementDoor => T("WorldThingUpperCourtyardTenementDoor");
+        public static string WorldThingUpperPierTenementDoor => T("WorldThingUpperPierTenementDoor");
+        public static string WorldThingCourtyardDoor => T("WorldThingCourtyardDoor");
+        public static string WorldThingUpperCourtyardDoor => T("WorldThingUpperCourtyardDoor");
+        public static string WorldThingPierDoor => T("WorldThingPierDoor");
+        public static string WorldThingUpperPierDoor => T("WorldThingUpperPierDoor");
+        public static string WorldThingApartment10Door => T("WorldThingApartment10Door");
+        // The Whirling-in-Rags' dev-named upper doors and the sea fortress ruin's three openings.
+        public static string WorldThingBalconyDoor => T("WorldThingBalconyDoor");
+        public static string WorldThingRoofDoor => T("WorldThingRoofDoor");
+        public static string WorldThingFortressMainDoor => T("WorldThingFortressMainDoor");
+        public static string WorldThingFortressEastDoor => T("WorldThingFortressEastDoor");
+        public static string WorldThingFortressHole => T("WorldThingFortressHole");
+        public static string WorldThingShackDoor => T("WorldThingShackDoor");
 
         /// <summary>Authored destination name for the secretary's office interior, whose game area
         /// label ("Harbour") would hide which door enters it (see EntityNaming.AuthoredAreaName).</summary>
@@ -1279,6 +1340,14 @@ namespace NonVisualCalculus.Core.Strings
         /// <summary>Authored destination name for the container yard's enterable cargo container,
         /// the third area labeled "Harbour" (see EntityNaming.AuthoredAreaName).</summary>
         public static string WorldPlaceCargoContainer => T("WorldPlaceCargoContainer");
+
+        /// <summary>Authored destination name for the coal room under the Capeside tenements, whose
+        /// game area label is "Capeside apartments" (see EntityNaming.AuthoredAreaName).</summary>
+        public static string WorldPlaceCoalRoom => T("WorldPlaceCoalRoom");
+
+        /// <summary>Authored destination name for the net picker's house in the fishing village,
+        /// whose game area label is the shared "Fishing village" (see EntityNaming.AuthoredAreaName).</summary>
+        public static string WorldPlaceNetPickersHouse => T("WorldPlaceNetPickersHouse");
 
         /// <summary>An exit named for where it goes: the destination (or outdoor spot) and the portal
         /// type word, composed by the translation so the word order is its choice ("Whirling in Rags
